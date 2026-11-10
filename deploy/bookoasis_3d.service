@@ -1,0 +1,18 @@
+# /etc/systemd/system/bookoasis_3d.service
+# 경로·User는 환경에 맞게 바꾼다. 보관함 파일(책 읽기·오디오북·영상)이 BookOasis와 같은 경로로 보여야 한다.
+[Unit]
+Description=BookOasis 3D Library
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/bookoasis_3d
+ExecStart=/opt/bookoasis_3d/venv/bin/python /opt/bookoasis_3d/app.py
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

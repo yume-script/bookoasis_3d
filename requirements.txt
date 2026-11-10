@@ -1,0 +1,9 @@
+# 기본 기능은 파이썬 표준 라이브러리만 쓴다 (Python 3.9+)
+# BookOasis DB(MariaDB/MySQL)에 직접 붙을 때 (BOOKOASIS_DB_URL=mysql://…)
+PyMySQL>=1.1
+# 표지 줄이기 (없으면 원본 크기로 보냄)
+Pillow>=9.0
+# AI를 Claude API(LIB3D_AI_PROVIDER=anthropic)로 쓸 때만 (OpenAI 호환·LiteLLM은 필요 없음)
+anthropic>=2.4
+# 브런치 낭독 코너의 Edge 음성 (선택, 없으면 브라우저 음성만)
+# edge-tts>=6.1
