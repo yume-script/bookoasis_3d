@@ -8,6 +8,7 @@
 저장: DATA_DIR/lib3d_deliveries.jsonl (한 줄 = 받은 것 하나, 웹 프로세스가 가끔 줄인다)
 """
 import hmac
+import itertools
 import json
 import os
 import threading
@@ -24,6 +25,7 @@ DUR = 52              # 배달 한 번 (입구 8초 → 데스크 30초 → 나�
 KINDS = {"book": "책", "webtoon": "웹툰", "video": "영상", "audio": "오디오북", "comic": "만화"}
 _LOCK = threading.Lock()
 _CACHE = {"sig": None, "rows": []}
+_SEQ = itertools.count(int(time.time()) & 0xffff)   # 같은 밀리초에 두 건이 와도 번호가 겹치지 않게
 _DONE = set()          # 이 프로세스에서 이미 채팅에 알린 배달
 
 
@@ -71,7 +73,7 @@ def add(items, sender="", note="", src="api"):
     items = _clean_items(items)
     if not items:
         raise ValueError("items에 제목을 하나 이상 넣어 주세요.")
-    row = {"t": time.time(), "id": "%x%04x" % (int(time.time() * 1000), os.getpid() & 0xffff), "src": str(src)[:20],
+    row = {"t": time.time(), "id": "%x%04x" % (int(time.time() * 1000), next(_SEQ) & 0xffff), "src": str(src)[:20],
            "from": " ".join(str(sender or "").split())[:30], "note": " ".join(str(note or "").split())[:160], "items": items}
     os.makedirs(config.data_dir(), exist_ok=True)
     line = (json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8")
