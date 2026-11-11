@@ -326,6 +326,14 @@
     }
   }, [1, 1]);
   facadeTex.wrapS = facadeTex.wrapT = T.RepeatWrapping;
+  var facadePbrTex = canvasTex(256, 512, function (g, w, h) {   // 같은 창 격자: 창은 매끈한 유리(하늘이 비침), 벽은 거친 돌 (G=거칠기, B=금속성)
+    g.fillStyle = 'rgb(0,225,0)'; g.fillRect(0, 0, w, h);
+    for (var y = 12; y < h - 8; y += 32) for (var x = 10; x < w - 10; x += 30) {
+      g.fillStyle = 'rgb(0,150,40)'; g.fillRect(x - 1, y - 1, 22, 22);   // 창틀
+      g.fillStyle = 'rgb(0,16,255)'; g.fillRect(x, y, 20, 20);
+    }
+  }, [1, 1]);
+  facadePbrTex.wrapS = facadePbrTex.wrapT = T.RepeatWrapping; facadePbrTex.encoding = T.LinearEncoding;
   Object.assign(M, {
     pano: new T.MeshBasicMaterial({ side: T.BackSide, fog: false, depthWrite: false }),   // 깊이를 쓰지 않아 원통 너머의 큰 산·숲이 그 위에 그려진다   // 그림은 applyOutside()가 상태별로
     lightPool: new T.MeshBasicMaterial({ map: canvasTex(64, 64, function (g) { var gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,150,0.55)'); gr.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }), transparent: true, depthWrite: false, opacity: 0 }),
@@ -336,7 +344,7 @@
     road: new T.MeshStandardMaterial({ map: roadTex, roughness: 0.9 }),
     trunk: new T.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 }),
     leaf: [0x5d8a4e, 0x6f9a55, 0x4f7a44, 0x83a862].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }); }),
-    facade: [0xd9d2c4, 0xb8c2cc, 0xe7e1d6, 0xa9b3ab, 0xcfc4b8].map(function (c) { return new T.MeshStandardMaterial({ map: facadeTex, color: c, roughness: 0.85 }); }),
+    facade: [0xd9d2c4, 0xb8c2cc, 0xe7e1d6, 0xa9b3ab, 0xcfc4b8].map(function (c) { return new T.MeshStandardMaterial({ map: facadeTex, color: c, roughness: 1, metalness: 1, roughnessMap: facadePbrTex, metalnessMap: facadePbrTex }); }),
     shopGlass: new T.MeshStandardMaterial({ color: 0x2a3540, roughness: 0.1, metalness: 0.5, emissive: 0x000000, emissiveIntensity: 0.9 }),
     parapet: new T.MeshStandardMaterial({ color: 0x8d9094, roughness: 0.8 }),
     awning: [0x7a2f2f, 0x2f4f6a, 0x3f5f3a, 0xc9a24a].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.8 }); }),
@@ -531,8 +539,28 @@
     [EXT.stone, EXT.metal, EXT.glass, EXT.soffit, EXT.spine].forEach(function (m) { m.envMapIntensity = m === EXT.glass ? envOut * 2.4 : envOut; m.userData.envSet = true; });
     extNight(night, dusk);
     campTint(o, f, envOut);
+    if (OUT_ENV) {   // 실제 하늘(HDR) 반사: 건물 유리창·서재 외장 유리·차·강물에 하늘과 구름이 비친다
+      var sky = night ? 0.07 : dusk ? 0.55 : grey ? 0.6 : 1;
+      M.facade.forEach(function (m) { m.envMapIntensity = sky; });
+      M.shopGlass.envMapIntensity = sky * 0.9; EXT.glass.envMapIntensity = sky * 1.1; EXT.metal.envMapIntensity = sky * 0.7;
+      CAR.paint.forEach(function (m) { m.envMapIntensity = sky * 0.8; }); CAR.glass.envMapIntensity = sky;
+      CAMP.water.envMapIntensity = Math.max(0.12, sky * 0.9);
+    }
   }
   setInterval(function () { applyOutside(); }, 60000);   // 자동(시간·계절·날씨)이면 1분마다 확인
+  // 바깥 건물용 환경 조명: 실제 하늘을 찍은 HDR 그림(three.js 예제의 royal_esplanade_1k.hdr, Poly Haven CC0)을 받아 반사에 쓴다.
+  // 못 받으면 예전처럼 실내 환경 조명으로 비친다. 서재 안 재질에는 쓰지 않는다.
+  var OUT_ENV = null, OUT_ENV_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r175/examples/textures/equirectangular/royal_esplanade_1k.hdr';
+  function loadOutEnv() {
+    if (!T.RGBELoader) return;
+    new T.RGBELoader().setDataType(T.UnsignedByteType).load(OUT_ENV_URL, function (tex) {
+      try {
+        var pm = new T.PMREMGenerator(renderer); OUT_ENV = pm.fromEquirectangular(tex).texture; tex.dispose(); pm.dispose();
+        [].concat(M.facade, CAR.paint, [M.shopGlass, M.parapet, EXT.glass, EXT.metal, EXT.stone, CAR.glass, CAMP.water]).forEach(function (m) { m.envMap = OUT_ENV; m.needsUpdate = true; });
+        applyOutside.force = true; applyOutside();
+      } catch (e) { console.warn('3D 서재 바깥 환경 조명:', e && e.message); }
+    }, undefined, function (e) { console.warn('3D 서재 바깥 환경 조명:', e && e.message); });
+  }
 
 
   // 창 구멍이 난 옆벽: 창 아래·위 띠 + 창 사이 기둥
@@ -961,6 +989,7 @@
     hammock: new T.MeshStandardMaterial({ color: 0x3b6fb0, roughness: 0.9, side: T.DoubleSide }),
     chair: new T.MeshStandardMaterial({ color: 0x4a5a48, roughness: 0.9 }),
     cooler: new T.MeshStandardMaterial({ color: 0xd9e4ea, roughness: 0.6 }),
+    lot: new T.MeshStandardMaterial({ color: 0x77736c, roughness: 1 }),
     fuji: new T.MeshBasicMaterial({ map: fujiTex, alphaTest: 0.5, fog: false, side: T.DoubleSide }),
     flare: new T.SpriteMaterial({ map: flareTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })
   };
@@ -977,7 +1006,8 @@
       tint(m, TENT_COLORS[i]);
       m.emissive.setHex(night ? 0xff8a2a : dusk ? 0x7a3a10 : 0x000000); m.emissiveIntensity = night ? (i % 3 === 2 ? 0.25 : 0.75) : 0.35;
     });
-    tint(CAMP.canopy, 0x3f7a55); tint(CAMP.stone, 0x6f6b66); tint(CAMP.hammock, 0x3b6fb0); tint(CAMP.chair, 0x4a5a48); tint(CAMP.cooler, 0xd9e4ea);
+    tint(CAMP.canopy, 0x3f7a55); tint(CAMP.stone, 0x6f6b66); tint(CAMP.hammock, 0x3b6fb0); tint(CAMP.chair, 0x4a5a48); tint(CAMP.cooler, 0xd9e4ea); tint(CAMP.lot, winter ? 0xd8dadb : 0x77736c); CAMP.lot.envMapIntensity = envOut;
+    if (HORSE.mats) HORSE.mats.forEach(function (m) { m.color.setHex(m.userData.base).multiplyScalar(Math.max(0.2, f)); m.envMapIntensity = envOut; });
     CAMP.pine.forEach(function (m, i) { tint(m, winter ? [0x9fb0a4, 0xaebcb2, 0x8fa398][i] : [0x2f5a3c, 0x3a6a45, 0x274d35][i]); });
     CAMP.lamp.emissive.setHex(lit ? 0xffc46a : 0x000000);
     CAMP.flare.opacity = night ? 0.7 : dusk ? 0.35 : 0;
@@ -989,8 +1019,8 @@
     var cz = (front + back) / 2, z0 = front + PLAZA_D + RIVER_GAP, z1 = z0 + RIVER_W, W = SCENE_R * 2;
     var farZ = cz + SCENE_R - 4, campZ1 = Math.min(z1 + CAMP_D, farZ - 18), hw = w / 2 + 4.6, r = rnd(907);
     var walk = floorIdx === 0 && cur === 0;
-    RV = walk ? { z0: z0, z1: z1, cz1: campZ1, hw: hw, blocks: [], seats: [], fire: null } : null;
-    campFx = { night: 0.25, flames: [], light: null, t: 0 };
+    RV = walk ? { z0: z0, z1: z1, cz1: campZ1, hw: hw, blocks: [], rects: [], seats: [], fire: null } : null;
+    campFx = { night: 0.25, flames: [], light: null, t: 0, horses: [], paddock: null, group: null };
     function plane(wd, dp, mat, x, y, z) { var m = new T.Mesh(new T.PlaneGeometry(wd, dp), mat); m.rotation.x = -Math.PI / 2; return add(m, x, y, z); }
     function ubox(sx, sy, sz, mat, x, y, z) { var m = new T.Mesh(unitBox, mat); m.scale.set(sx, sy, sz); return add(m, x, y, z); }
     // 땅(강 이쪽·저쪽) + 강물(땅보다 낮게) + 돌 둑
@@ -1084,10 +1114,37 @@
     block(fxp, fzp, 0.9); if (RV) RV.fire = { x: fxp, z: fzp };
     for (var ci = 0; ci < 6; ci++) { var ca = ci / 6 * Math.PI * 2 + 0.3, cx1 = fxp + Math.sin(ca) * 2.1, cz1 = fzp + Math.cos(ca) * 2.1; chair(cx1, cz1, ca + Math.PI, ci % 2 === 1); }
     // 텐트 자리: 가운데 길(|x|<3)과 모닥불 둘레를 피해 줄지어
+    // 주차장 (길 쪽 한편에 줄지어) - 차는 텐트 사이에 두지 않는다
+    function inRect(R, x, z, m) { return x > R.x0 - m && x < R.x1 + m && z > R.z0 - m && z < R.z1 + m; }
+    var nCars = 5, PK = { x0: hw - 7.2, x1: hw - 0.2, z0: z1 + 2.2, z1: z1 + 2.2 + nCars * 3.0 + 0.6 };
+    plane(PK.x1 - PK.x0, PK.z1 - PK.z0, M.road, (PK.x0 + PK.x1) / 2, gy + 0.016, (PK.z0 + PK.z1) / 2).material = CAMP.lot;
+    for (var pk = 0; pk <= nCars; pk++) ubox(5.2, 0.02, 0.1, CAMP.cooler, PK.x0 + 3.4, gy + 0.03, PK.z0 + 0.3 + pk * 3.0);   // 주차 칸 선
+    for (var pc = 0; pc < nCars; pc++) {
+      ubox(1.9, 0.14, 0.2, M.parapet, PK.x1 - 0.5, gy + 0.07, PK.z0 + 1.8 + pc * 3.0).rotation.y = Math.PI / 2;   // 바퀴 멈춤턱
+      if (pc === 3) continue;   // 한 칸은 비워 둔다
+      var pcar = makeCar(r); pcar.position.set(PK.x0 + 3.6 + (r() - 0.5) * 0.4, gy, PK.z0 + 1.8 + pc * 3.0); pcar.rotation.y = (r() < 0.7 ? 1 : -1) * Math.PI / 2 + (r() - 0.5) * 0.06; parent.add(pcar);
+    }
+    var psign = new T.Mesh(new T.PlaneGeometry(0.8, 0.8), new T.MeshBasicMaterial({ map: textTex(['P'], 128, 128, '#1f4fa8', '#ffffff', 100), toneMapped: false })); psign.rotation.y = -Math.PI / 2;
+    add(psign, PK.x0 - 0.1, gy + 2.3, PK.z0 + 0.3); ubox(0.08, 2.7, 0.08, M.pole, PK.x0 - 0.05, gy + 1.35, PK.z0 + 0.3);
+    lantern(PK.x0 - 0.3, PK.z1 - 0.3, 2.6);
+    if (RV) RV.rects.push(PK);
+    // 말 방목장 (캠핑장 안쪽 왼편, 나무 울타리 안을 말들이 달린다)
+    var PD = { x0: -hw + 1, x1: -hw + 18, z0: campZ1 - 14, z1: campZ1 - 1 };
+    [[PD.x0, PD.z0, PD.x1, PD.z0], [PD.x0, PD.z1, PD.x1, PD.z1], [PD.x0, PD.z0, PD.x0, PD.z1], [PD.x1, PD.z0, PD.x1, PD.z1]].forEach(function (e) {
+      var len = Math.hypot(e[2] - e[0], e[3] - e[1]), alongX = e[1] === e[3];
+      [0.55, 1.05].forEach(function (y) { ubox(alongX ? len : 0.07, 0.09, alongX ? 0.07 : len, CAMP.wood, (e[0] + e[2]) / 2, gy + y, (e[1] + e[3]) / 2); });
+      for (var d0 = 0; d0 <= len + 0.01; d0 += len / Math.round(len / 2.4)) ubox(0.14, 1.25, 0.14, CAMP.wood, e[0] + (alongX ? d0 : 0), gy + 0.62, e[1] + (alongX ? 0 : d0));
+    });
+    plane(PD.x1 - PD.x0 - 1.5, PD.z1 - PD.z0 - 1.5, CAMP.dirt, (PD.x0 + PD.x1) / 2, gy + 0.013, (PD.z0 + PD.z1) / 2);
+    ubox(1.6, 0.5, 0.6, CAMP.wood, PD.x1 - 1.6, gy + 0.3, PD.z0 + 1.2);   // 물통
+    if (RV) RV.rects.push(PD);
+    campFx.paddock = { cx: (PD.x0 + PD.x1) / 2, cz: (PD.z0 + PD.z1) / 2, rx: (PD.x1 - PD.x0) / 2 - 2.2, rz: (PD.z1 - PD.z0) / 2 - 2.2, gy: gy };
+    campFx.group = parent; addHorses();
     var spots = [], rowsN = Math.max(2, Math.floor((campZ1 - z1 - 8) / 11));
     for (var ry0 = 0; ry0 < rowsN; ry0++) for (var sx0 = -hw + 5; sx0 <= hw - 5; sx0 += 9.5) {
       var tx = sx0 + (r() - 0.5) * 3, tz2 = z1 + 6 + ry0 * 11 + (r() - 0.5) * 3 + (ry0 === 0 ? 0 : 3);
       if (Math.abs(tx) < 4.2 || Math.hypot(tx - fxp, tz2 - fzp) < 6.5 || Math.abs(tz2 - (z1 + 15)) < 3.2) continue;
+      if (inRect(PK, tx, tz2, 3.2) || inRect(PD, tx, tz2, 3.4)) continue;   // 주차장·말 방목장 자리는 비운다
       spots.push([tx, tz2]);
     }
     spots.forEach(function (sp, si) {
@@ -1095,10 +1152,6 @@
       tent(kind, sp[0], sp[1], ry, mat);
       if (kind >= 2) { table(sp[0], sp[1]); chair(sp[0] - 1.2, sp[1] + 0.9, 1.2, true); chair(sp[0] + 0.3, sp[1] - 1.1, -0.3, false); }
       if (r() < 0.75) lantern(sp[0] + Math.sin(ry) * 2.8 + 0.6, sp[1] + Math.cos(ry) * 2.8, 1.5 + r() * 0.6);
-      if (si % 4 === 1) {   // 텐트 옆에 세워 둔 차
-        var car = makeCar(r), cxp = sp[0] + (sp[0] > 0 ? 4.4 : -4.4);
-        if (Math.abs(cxp) < hw - 1.5) { car.position.set(cxp, gy, sp[1]); car.rotation.y = (r() - 0.5) * 0.8; parent.add(car); block(cxp, sp[1], 2.3); }
-      }
     });
     // 줄 전구 (기둥 사이에 늘어뜨린 작은 전구)
     [[-hw + 3, z1 + 4.5, -6, z1 + 4.5], [5, z1 + 20.5, hw - 4, z1 + 20.5]].forEach(function (ln) {
@@ -1112,11 +1165,37 @@
     for (var hk = 0; hk < 9; hk++) { var ht = (hk + 0.5) / 9, hs = ubox(0.4, 0.03, 0.85, CAMP.hammock, hx - 1.6 + ht * 3.2, gy + 1.25 - Math.sin(ht * Math.PI) * 0.6, hz); hs.rotation.z = -Math.cos(ht * Math.PI) * 0.55; }
     block(hx, hz, 1.6); lantern(hx + 2.6, hz + 0.8, 1.8);
   }
+  // 말: three.js 예제 webgl_morphtargets_horse의 Horse.glb (모양 변형으로 달리는 동작). 모형은 볼 때 CDN에서 받는다.
+  var HORSE = { mesh: null, clip: null, scale: 1, lift: 0, mats: null };
+  function loadHorse() {
+    if (!T.GLTFLoader) return;
+    new T.GLTFLoader().load(MODEL_BASE + 'Horse.glb', function (gl) {
+      var mesh = null; gl.scene.traverse(function (o) { if (o.isMesh && !mesh) mesh = o; });
+      if (!mesh || !gl.animations.length) return;
+      mesh.geometry.userData.shared = true;
+      HORSE.scale = 1.75 / 190; HORSE.lift = 0;   // 모형 키가 190쯤(발이 바닥) - 모양 변형 모형이라 상자로는 잴 수 없다
+      HORSE.mats = [0xffffff, 0xd8c3a5, 0x8a6a52].map(function (c) { var m = mesh.material.clone(); m.userData.keep = true; m.userData.envSet = true; m.userData.base = c; m.morphTargets = true; return m; });
+      HORSE.mesh = mesh; HORSE.clip = gl.animations[0];
+      addHorses(); applyOutside.force = true; applyOutside();
+    }, undefined, function (e) { console.warn('3D 서재 말 모형:', e && e.message); });
+  }
+  function addHorses() {   // 방목장을 도는 말 세 마리 (모형을 받은 뒤, 층을 지을 때마다)
+    if (!HORSE.mesh || !campFx || !campFx.paddock || !campFx.group || campFx.horses.length) return;
+    for (var i = 0; i < 3; i++) {
+      var h = new T.Mesh(HORSE.mesh.geometry, HORSE.mats[i]); h.scale.setScalar(HORSE.scale * (1 - i * 0.07)); h.castShadow = false;
+      if (HORSE.mesh.morphTargetInfluences) { h.morphTargetInfluences = HORSE.mesh.morphTargetInfluences.slice(); h.morphTargetDictionary = HORSE.mesh.morphTargetDictionary; }
+      var mx = new T.AnimationMixer(h); mx.clipAction(HORSE.clip).setDuration(0.9 + i * 0.08).play(); mx.update(i * 0.31);
+      campFx.group.add(h);
+      campFx.horses.push({ m: h, mixer: mx, a: i * 2.1, k: 1 - i * 0.12, lift: HORSE.lift * (1 - i * 0.07) });
+    }
+    updateCamp(0, performance.now());
+  }
   function campWalk(x, z) {   // 가운데 나무다리 + 캠핑장 풀밭 (텐트·차·모닥불은 돌아서)
     if (!RV || !layout) return false;
     if (Math.abs(x) < 1.45 && z >= layout.front + PLAZA_D - 0.5 && z <= RV.z1 + 1) return true;
     if (Math.abs(x) <= RV.hw && z >= RV.z1 + 0.6 && z <= RV.cz1) {
       for (var i = 0; i < RV.blocks.length; i++) { var b = RV.blocks[i]; if (Math.hypot(x - b.x, z - b.z) < b.r) return false; }
+      for (var j = 0; j < RV.rects.length; j++) { var R = RV.rects[j]; if (x > R.x0 - 0.3 && x < R.x1 + 0.3 && z > R.z0 - 0.3 && z < R.z1 + 0.3) return false; }   // 주차장·방목장 울타리 안
       return true;
     }
     return false;
@@ -1143,6 +1222,14 @@
     for (var i = 0; i < campFx.flames.length; i++) {
       var f = campFx.flames[i], s = 0.75 + Math.sin(now / 90 + f.ph) * 0.2 + Math.sin(now / 37 + f.ph * 2) * 0.1;
       f.m.scale.set(0.8 + s * 0.3, s, 0.8 + s * 0.3); f.m.position.y = f.y + (s - 0.75) * 0.25;
+    }
+    var P = campFx.paddock;
+    for (var hi = 0; hi < campFx.horses.length; hi++) {   // 말: 울타리 안 타원 길을 따라 달린다
+      var H = campFx.horses[hi], rk = 1 - hi * 0.13;
+      H.mixer.update(dt); H.a += dt * 0.85 * H.k;
+      var hx = Math.sin(H.a) * P.rx * rk, hz = Math.cos(H.a) * P.rz * rk;
+      H.m.position.set(P.cx + hx, P.gy + H.lift, P.cz + hz);
+      H.m.rotation.y = Math.atan2(Math.cos(H.a) * P.rx * rk, -Math.sin(H.a) * P.rz * rk);
     }
     if (campFx.light) campFx.light.intensity = campFx.night * (1.5 + Math.sin(now / 110) * 0.25 + Math.sin(now / 43) * 0.15);
   }
@@ -5442,6 +5529,8 @@
   resize();
   home();
   loadHumans();
+  loadOutEnv();
+  loadHorse();
   build(false);
   requestAnimationFrame(frame);
   if ('ResizeObserver' in window) new ResizeObserver(resize).observe(wrap);

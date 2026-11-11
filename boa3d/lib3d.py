@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 
 from . import bookoasis_db, config
 
-VERSION = "2.50.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
+VERSION = "2.51.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
 CACHE_SEC = 300
 COVER_WIDTH = 200
 _DATA = {"at": 0.0, "v": None}
