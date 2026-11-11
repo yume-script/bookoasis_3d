@@ -88,6 +88,8 @@ class ServerTest(unittest.TestCase):
         code, body = c.req("/api/auth/setup", {"username": "admin", "password": "secret123"})
         self.assertEqual(code, 200, body)
         self.assertTrue(c.cookie.startswith("boa3d_session="))
+        code, log = c.req("/api/changelog")
+        self.assertTrue(code == 200 and log["text"].startswith("# 변경 내역") and ("## " + log["version"]) in log["text"])   # 지금 버전이 변경 내역에 있다
         code, mods = c.req("/api/modules")
         self.assertEqual((mods["lib3d"], mods["role"]), (True, "admin"))
         code, data = c.req("/api/lib3d/data")

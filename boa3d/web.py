@@ -525,6 +525,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(302, b"", extra={"Location": "/library3d"})
         if path == "/api/users":
             return self._send(200, {"success": True, "users": [auth.public_user(u) for u in auth.load_users()]})
+        if path == "/api/changelog":   # 변경 내역 (CHANGELOG.md 그대로 - 화면 [설정 > 변경 내역])
+            try:
+                with open(os.path.join(config.ROOT, "CHANGELOG.md"), encoding="utf-8") as f:
+                    text = f.read(300000)
+            except OSError:
+                text = ""
+            return self._send(200, {"success": True, "version": version(), "text": text})
         if path == "/api/modules":   # 화면 틀(shell.js): 메뉴·버전·테마·내 계정
             info = dict(mods, version=version(), versions={"lib3d": version()}, ui=ui_prefs(), user=user["username"],
                         role=auth.role_of(user), windows=os.name == "nt", standalone=True)

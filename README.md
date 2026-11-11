@@ -9,7 +9,15 @@
 - AI 직원(사서·도슨트·대표·큐레이터·청음실 주인)과 AI 손님 - OpenAI 호환 API 또는 Claude API, BookOasis MCP
 - 배달: 웹툰 다운로더·디스코드 봇 등 바깥 프로그램이 `POST /api/lib3d/events`로 보내면 배달원이 안내 데스크로
 - 디스코드 채널 연동(선택): 웹후크로 서재 채팅 보내기, 봇 토큰으로 채널 대화 받기 - 말한 사람은 "[출판사] 애순이" 같은 손님으로 1층에
+- 1층 밖: 순환 도로와 길 건너 건물, 서재 앞 강과 다리, 강 건너 캠핑장(텐트·화롯대·말·새)과 큰 산. 창밖 풍경은 시간·계절·**기준 도시의 실제 날씨**
+- 서재 소식(선택): 누가 들어왔는지, BookOasis·Plex·YMPlayer에서 누가 무엇을 읽고 보는지 채팅으로 알림
 - 계정: 관리자(모든 설정) / 관람자(둘러보기·읽기·함께 보기, 성인 층은 허용한 사람만)
+
+| 문서 | 내용 |
+|---|---|
+| [docs/guide.md](docs/guide.md) | 설치·설정·쓰는 법·코너별 안내·`.env` 전체 목록·배포(도커·프록시·백업·보안)·문제 해결 |
+| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 내역 (화면 [설정 > 변경 내역]에서도) |
+| [env.example](env.example) | 설정 예시 (주석 포함) |
 
 파이썬 표준 라이브러리로 도는 웹 서버(Python 3.9+)와 three.js 화면입니다. BookOasis DB(MariaDB/MySQL 또는 SQLite) 읽기 권한이 필요합니다.
 
@@ -48,6 +56,8 @@ boa3d/lib3d_presence.py     함께 보기·채팅
 boa3d/lib3d_brunch.py       브런치 연재 낭독 코너
 boa3d/lib3d_jazz.py         재즈 청음실 (인터넷 재즈 라디오 중계)
 boa3d/lib3d_ymp.py          영화관 (YMPlayer IPTV·텔레그램 중계)
+boa3d/lib3d_discord.py      디스코드 채널 연동 (웹후크 보내기, 봇 토큰으로 받기)
+boa3d/lib3d_activity.py     서재 소식 (접속·읽기·재생 알림)
 web/lib3d/                  3D 화면 (index.html, app.js - three.js r128)
 web/shell.js, theme.css     화면 틀(사이드바·테마·계정), login.*
 mini/                       오락실 미니게임 (ym_mini_game)

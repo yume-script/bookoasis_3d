@@ -265,6 +265,42 @@
         return h('div', {}, [list, h('p', { class: 'muted', text: 'BookOasis DB·주소, 오락실, 배달 토큰 같은 실행 환경은 .env에서 바꿉니다 (env.example, docs/guide.md).' })]);
       }
     };
+    pages['변경 내역'] = function () {   // CHANGELOG.md를 받아 버전별로 보여 준다 (제목·목록만 꾸미는 간단한 표시)
+      var box = h('div', { class: 'changelog' }, [h('p', { class: 'muted', text: '불러오는 중...' })]);
+      fetch('api/changelog', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+        while (box.firstChild) box.removeChild(box.firstChild);
+        var text = String(d.text || '');
+        if (!text) { box.appendChild(h('p', { class: 'muted', text: '변경 내역 파일(CHANGELOG.md)이 없습니다.' })); return; }
+        var ul = null;
+        function inline(el, line) {   // **굵게**와 `코드`만
+          line.split(/(\*\*[^*]+\*\*|`[^`]+`)/).forEach(function (part) {
+            if (/^\*\*.+\*\*$/.test(part)) el.appendChild(h('b', { text: part.slice(2, -2) }));
+            else if (/^`.+`$/.test(part)) el.appendChild(h('code', { text: part.slice(1, -1) }));
+            else if (part) el.appendChild(document.createTextNode(part.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')));
+          });
+          return el;
+        }
+        text.split('\n').forEach(function (raw) {
+          var line = raw.replace(/\s+$/, '');
+          var m;
+          if (!line || line === '---') { ul = null; return; }
+          if ((m = /^## (.+)/.exec(line))) {
+            ul = null;
+            var cur = m[1].trim() === String(d.version || '');
+            box.appendChild(h('h4', { class: 'changelog-ver' + (cur ? ' current' : ''), text: 'v' + m[1].trim() + (cur ? '  · 지금 버전' : '') }));
+            return;
+          }
+          if (/^# /.test(line)) return;
+          if ((m = /^(\s*)- (.+)/.exec(line))) {
+            if (!ul) { ul = h('ul', { class: 'changelog-list' }); box.appendChild(ul); }
+            var li = inline(h('li', {}), m[2]); if (m[1].length >= 2) li.className = 'sub';
+            ul.appendChild(li); return;
+          }
+          ul = null; box.appendChild(inline(h('p', { class: 'muted' }), line));
+        });
+      }).catch(function () { while (box.firstChild) box.removeChild(box.firstChild); box.appendChild(h('p', { class: 'muted', text: '변경 내역을 불러오지 못했습니다.' })); });
+      return box;
+    };
     function show(name) {
       tabs.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.textContent === name); });
       while (pane.firstChild) pane.removeChild(pane.firstChild);

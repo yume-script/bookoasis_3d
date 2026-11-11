@@ -15,6 +15,10 @@ BookOasis 서재를 모던 서점 건물로 지어, 그 안을 걸어 다니며 
 8. [`.env` 전체 목록](#8-env-전체-목록)
 9. [저장되는 파일](#9-저장되는-파일)
 10. [문제 해결](#10-문제-해결)
+11. [배포·운영 (도커·프록시·백업·보안)](#11-배포운영-도커프록시백업보안)
+12. [변경 내역과 버전](#12-변경-내역과-버전)
+
+> 처음이라면 **2 → 2-6 확인 → 5 쓰는 법** 순서로 보면 됩니다. 선택 기능(AI·영화관·디스코드·서재 소식)은 나중에 하나씩 켜도 됩니다.
 
 ---
 
@@ -30,6 +34,15 @@ BookOasis 세션(일반·성인·오디오북·비디오)마다 한 층, 보관�
 | 3층 오디오북 | 오디오북 (여기서 듣기) | **입구 오른쪽** 청음 부스 | - |
 | 4층 비디오 | 영상 (여기서 보기) | **입구 오른쪽** 시청 부스 | - |
 | 맨 위 영화관 | - | 상영관 (큰 스크린 + 좌석 6줄) - YMPlayer의 IPTV·텔레그램 상영 | `LIB3D_YMPLAYER_*` |
+
+**1층 바깥** (유리 자동문 또는 아래 메뉴 [외부로])
+
+| 곳 | 무엇이 있나 |
+|---|---|
+| 앞마당·양옆 보도 | 벤치, 가로수, 가로등, 순환 도로를 도는 차 |
+| 길 건너 건물 1층 | **갤러리**(표지 전시) · **재즈 청음실**(인터넷 재즈 라디오) · **사무실**(대표 자리, 회의 탁자 - 디스코드에서 온 사람이 앉는 곳). 건물 이름은 [창밖 풍경 > 거리] |
+| 강과 다리 | 서재 앞 큰 강, 가운데 나무다리와 양옆 길 다리 |
+| 강 건너 캠핑장 | 텐트 다섯 가지, 화롯대, 해먹, 주차장, 말 방목장, 캠핑하는 사람들, 하늘의 새, 뒤로 침엽수 숲과 큰 산 |
 
 어느 층이든: 손님들(사람·스톰트루퍼·엘프·**로봇 손님**), 함께 보는 사람·채팅, AI 직원(사서·도슨트)과 AI 손님(AI 설정 시), 창밖 풍경(시간·계절·날씨), 표지 포스터, 의자에 앉기.
 
@@ -489,7 +502,16 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 | `LIB3D_MCP_COMMAND` / `LIB3D_MCP_SERVERS` / `LIB3D_AI_BUILTIN` | - / - / `true` | AI 도구 |
 | `LIB3D_EVENT_TOKEN` | (비움) | 바깥 프로그램이 배달·직원의 말을 보내는 `POST /api/lib3d/events` 토큰 ([6-8](#6-8-배달과-바깥-ai-전화)) |
 | `LIB3D_DISCORD_*` | (비움) | 디스코드 채널 연동 - 웹후크(보내기)·봇 토큰(받기)·채널·이름표·보낼 것·간격 ([6-9](#6-9-디스코드-채널-연동-선택-기본-꺼짐)) |
+| `LIB3D_DISCORD_THREAD_ID` | (비움) | 스레드(포럼 글)로 보낼 때 스레드 ID (웹후크 주소 뒤 `?thread_id=`로도 됨) |
+| `LIB3D_ACTIVITY` | `join,read,watch` | 서재 소식으로 알릴 것 (비우면 끔) ([6-10](#6-10-서재-소식-접속읽기재생-알림)) |
+| `LIB3D_ACTIVITY_SKIP` | (비움) | 제목에 이 말이 있으면 알리지 않음 (쉼표로) |
+| `LIB3D_PLEX_URL` / `LIB3D_PLEX_TOKEN` | (비움) | 서재 소식의 Plex 재생 알림 |
+| `LIB3D_YMPLAYER_MCP_TOKEN` | (비움) | 서재 소식의 YMPlayer 재생 알림 (관리자 사용자의 MCP 토큰, YMPlayer 1.1.94부터) |
+| `LIB3D_REMOTE_AI` | `0` | 예전 방식 '바깥 AI (전화)' 설정 칸을 다시 보이게 |
+| `UPDATE_CHECK_URL` | (GitHub의 VERSION) | 새 버전 확인 주소 (비우면 확인 안 함) |
 | `MINI_ENABLED` / `MINI_COVERS_DIR` | `true` / - | 미니게임(오락실) / 그림 땅따먹기 표지 폴더 |
+
+날씨 기준 도시, 창밖 풍경, 거리 건물 이름, 인물 수, AI 직원처럼 **화면에서 바꾸는 것**은 `.env`가 아니라 `DATA_DIR`의 파일에 저장됩니다([9](#9-저장되는-파일)).
 
 ---
 
@@ -540,7 +562,91 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 | 영화관 "YMPlayer 로그인 실패" / "연결하지 못했습니다" | `LIB3D_YMPLAYER_INTERNAL`(이 서버에서 열리는 주소)·계정·비밀번호, YMPlayer가 켜져 있는지 |
 | 영화관에서 채널이 안 나옴 | YMPlayer에서는 나오는지, DASH(.mpd)는 아직 안 됨, [YMPlayer 새 탭]으로 비교 |
 | 오락실이 없음 | `MINI_ENABLED`, 건물 폭(보관함이 아주 적으면 생략) |
+| 재즈 청음실에서 소리가 안 남 | 서버에서 방송국 주소에 접속되는지, 다른 방송국으로 바꿔 보기, 브라우저가 자동 재생을 막으면 [▶ 듣기]를 한 번 더 |
+| 청음실·갤러리·사무실 건물이 없음 | [창밖 풍경 > 거리]에서 건물 이름이 비어 있지 않은지. 1층에서만 들어갈 수 있음 |
+| 말·새가 안 보임 / 건물 유리에 하늘이 안 비침 | 브라우저가 cdn.jsdelivr.net에서 모형·하늘 그림을 받지 못함 (없어도 나머지는 그대로) |
+| 창밖 날씨가 실제와 다름 | [창밖 풍경]의 날씨가 '자동'인지, 날씨 기준 도시, 서버에서 `api.open-meteo.com` 접속 (못 받으면 날마다 바뀌는 날씨) |
+| 디스코드로 안 감 | [AI 직원 > 기본·배달]의 디스코드 상태에 적힌 이유. 웹후크 주소 형식, 스레드가 보관됐는지 |
+| 디스코드 글이 서재에 안 옴 | 봇의 Message Content Intent, 채널(스레드) 보기 권한, `LIB3D_DISCORD_CHANNEL_ID` |
+| 서재 소식이 안 옴 | `LIB3D_ACTIVITY`, 처음 켠 뒤에는 새로 생긴 것부터 알림. Plex는 주소·토큰, YMPlayer는 관리자 MCP 토큰과 1.1.94 이상인지 |
+| 바깥이 느림 (나무·건물이 많아짐) | [3D 모형]을 '지금 그대로'로, 브라우저 하드웨어 가속, 다른 탭 닫기 |
 
 ---
 
-**출처** - 3D 모형 파일: GlamVelvetSofa·ChairDamaskPurplegold (© Wayfair, Eric Chadwick, CC BY 4.0), DiffuseTransmissionPlant (© Darmstadt Graphics Group, CC BY 4.0) - Khronos glTF Sample Assets / Ferrari 458 Italia (vicent091036, three.js 예제). 사람 모형: three.js 예제의 Xbot·Michelle·readyplayer.me·스톰트루퍼·엘프. 로봇 손님: RobotExpressive (Tomás Laulhé / Quaternius, CC0, 표정·동작 Don McCurdy) - three.js 예제.
+## 11. 배포·운영 (도커·프록시·백업·보안)
+
+### 11-1. 도커로 돌리기
+
+공식 이미지는 없고, 파이썬 이미지에 폴더를 붙여 돌리면 됩니다. **보관함 폴더는 BookOasis와 같은 경로**로 붙여야 '여기서 읽기·듣기·보기'가 됩니다.
+
+```yaml
+services:
+  bookoasis_3d:
+    image: python:3.12-slim
+    working_dir: /app
+    command: sh -c "pip install -r requirements.txt && python app.py"
+    env_file: .env                    # WEB_HOST=0.0.0.0 으로
+    ports: ["5932:5932"]
+    volumes:
+      - ./:/app                       # 이 저장소 (data/ 포함)
+      - /mnt/library:/mnt/library:ro  # BookOasis와 같은 경로로 (읽기 전용이면 충분)
+    restart: unless-stopped
+```
+
+BookOasis MCP를 `docker exec`로 부르는 설정(`LIB3D_MCP_COMMAND`)은 컨테이너 안에서 도커를 쓸 수 없으면 동작하지 않습니다. 그때는 호스트에 직접 설치하거나 MCP 없이 씁니다.
+
+### 11-2. 리버스 프록시·HTTPS
+
+바깥(인터넷)에서 열려면 프록시 뒤에 두고 HTTPS를 씌우세요. 위치 보내기가 잦으므로(0.4초마다) 요청 수 제한을 걸었다면 `/api/lib3d/presence`는 풀어 줍니다.
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:5932;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 300;      # 오디오·영상·재즈 라디오 중계
+    proxy_buffering off;         # 스트림이 끊기지 않게
+    client_max_body_size 20m;
+}
+```
+
+하위 경로(`/library/` 등)에 두는 것은 시험하지 않았습니다. 하위 도메인을 권장합니다.
+
+### 11-3. 백업과 복구
+
+- 백업할 것: **`.env`** 와 **`DATA_DIR` 폴더**([9](#9-저장되는-파일)). `lib3d_covers/`는 다시 받으므로 빼도 됩니다.
+- 복구: 새로 설치한 뒤 두 가지를 그대로 넣고 재시작. `secret.key`를 잃으면 모두 다시 로그인하면 됩니다.
+- BookOasis DB에는 아무것도 쓰지 않습니다(읽기만).
+
+### 11-4. 보안 점검
+
+| 점검 | 설명 |
+|---|---|
+| `.env` 권한 | `chmod 600 .env`. 저장소에 올리지 않습니다(`.gitignore`에 들어 있음) |
+| 첫 관리자 비밀번호 | `WEB_PASSWORD`로 만든 뒤 화면에서 바꾸기. 관람자 계정은 성인 층 허용을 따로 |
+| DB 계정 | BookOasis DB는 **읽기 전용 계정**이면 충분 |
+| 토큰 | `LIB3D_EVENT_TOKEN`, 디스코드 봇 토큰·웹후크, Plex 토큰, YMPlayer MCP 토큰, AI 키는 `.env`에만. 화면과 로그에 내보내지 않습니다 |
+| 바깥 공개 | 계정이 하나도 없으면 `127.0.0.1` 밖으로는 시작하지 않습니다. 인터넷에 열 때는 HTTPS |
+| 서재 소식 | 누가 무엇을 읽는지 알리는 기능이므로, 함께 쓰는 사람에게 미리 알리거나 `LIB3D_ACTIVITY`에서 뺍니다 |
+
+### 11-5. 여러 프로그램과 함께 쓸 때
+
+| 프로그램 | 이어지는 곳 |
+|---|---|
+| BookOasis | DB(읽기)·표지·뷰어 링크. MCP(`LIB3D_MCP_COMMAND`)로 AI 직원이 서재를 검색 |
+| BookOasis Assistant | `.env`에 `LIB3D_URL`·`LIB3D_EVENT_TOKEN` → 메뉴 연결, 웹툰 배달 |
+| YMPlayer | 영화관 층(`LIB3D_YMPLAYER_*`), 서재 소식(`LIB3D_YMPLAYER_MCP_TOKEN`) |
+| Plex | 서재 소식(`LIB3D_PLEX_*`) |
+| 디스코드 | 채널 연동(`LIB3D_DISCORD_*`) |
+
+---
+
+## 12. 변경 내역과 버전
+
+- 버전은 저장소의 `VERSION` 파일과 화면 왼쪽 위 배지에 보입니다. 관리자에게는 [설정 > 정보]에 GitHub의 최신 버전과 업데이트 여부가 나옵니다.
+- **무엇이 바뀌었는지**: 저장소의 [`CHANGELOG.md`](../CHANGELOG.md), 또는 화면 **[설정] > 변경 내역** 탭(지금 버전에 표시).
+- 업데이트는 [2-4](#2-4-업데이트). 업데이트 뒤 화면이 예전 모습이면 브라우저를 새로고침(Ctrl+F5)합니다.
+
+---
+
+**출처** - 바깥 풍경: 말·새(Horse·Stork·Flamingo·Parrot, mirada / ro.me - three.js 예제), 하늘 반사 그림 royal_esplanade_1k.hdr(Poly Haven, CC0 - three.js 예제), 날씨 Open-Meteo. 3D 모형 파일: GlamVelvetSofa·ChairDamaskPurplegold (© Wayfair, Eric Chadwick, CC BY 4.0), DiffuseTransmissionPlant (© Darmstadt Graphics Group, CC BY 4.0) - Khronos glTF Sample Assets / Ferrari 458 Italia (vicent091036, three.js 예제). 사람 모형: three.js 예제의 Xbot·Michelle·readyplayer.me·스톰트루퍼·엘프. 로봇 손님: RobotExpressive (Tomás Laulhé / Quaternius, CC0, 표정·동작 Don McCurdy) - three.js 예제.
