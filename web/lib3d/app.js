@@ -4356,6 +4356,12 @@
   });
   el('l3d-floor-btn').addEventListener('click', function () { if (map.classList.contains('on')) closeMap(); else openFloors(); });
   el('l3d-home').addEventListener('click', function () { home(); closeMap(); });
+  el('l3d-outside').addEventListener('click', function () {   // 외부로: 1층 밖, 서재와 캠핑장 사이 강 위 나무다리 한가운데 (캠핑장 쪽을 보고)
+    if (!floors.length) return;
+    if (cur !== 0) buildFloor(0);
+    if (RV) { camera.position.set(0, EYE, (RV.z0 + RV.z1) / 2); yaw = Math.PI; pitch = 0.05; } else home();
+    closeMap();
+  });
   el('l3d-reload').addEventListener('click', function () { build(true); });
 
   var whereEl = el('l3d-where');
