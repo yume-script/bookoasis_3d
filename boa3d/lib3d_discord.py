@@ -32,6 +32,7 @@ ENTER_SEC = 6          # 입구에서 라운지로 걸어 들어오는 동안
 LEAVE_SEC = 20         # 입구로 걸어 나가는 동안
 SAY_SEC = 12           # 말풍선이 떠 있는 시간
 MAX_GUESTS = 8
+MAX_PEOPLE = 16        # 화면에 세우는 사람 수 (말한 사람 + 위치를 아는 사람)
 _WEBHOOK_RE = re.compile(r"^https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api(?:/v\d+)?/webhooks/(\d+)/([\w-]+)(?:[?&](.*))?$")
 _THREAD_RE = re.compile(r"(?:^|&)thread_id=(\d+)(?:&|$)")
 _LOCK = threading.Lock()
@@ -289,19 +290,37 @@ def _poll_once():
 
 
 def public(now=None):
-    """3D 화면용 디스코드 손님 (1층): 들어옴(입구) → 라운지 → 말이 끊기면 입구로 나감"""
+    """3D 화면용 디스코드 손님 (1층): 말한 사람 + 바깥 프로그램이 위치를 알려 준 사람(lib3d_where).
+    자리(place)는 그 사람이 지금 있다는 곳 - 모르면 사무실 회의 탁자. 집에 있거나 자는 사람은 보이지 않는다.
+    말한 사람은 들어옴(입구) → 자리 → 말이 끊기면 나감, 위치만 아는 사람은 그 자리에 그대로."""
+    from . import lib3d_where
     now = now or time.time()
-    out = []
+    out, names = [], set()
+    where = lib3d_where.everyone(now)
+    tag = "[%s] " % label()
     with _LOCK:
         for key, g in _GUESTS.items():
             idle = now - g["last"]
             if idle > STAY_SEC + LEAVE_SEC:
                 continue
-            target = "entrance" if (now - g["first"] < ENTER_SEC or idle > STAY_SEC) else "office"   # 길 건너 사무실 의자에 앉는다 (사무실이 없으면 화면이 라운지에 세운다)
-            out.append({"id": "dc_" + hashlib.md5(key.encode("utf-8")).hexdigest()[:12], "kind": "discord", "name": g["name"], "job": "",
-                        "call": "", "post": "entrance", "look": 61 + g["slot"] * 3, "target": target, "slot": g["slot"],
+            plain = g["name"][len(tag):] if g["name"].startswith(tag) else g["name"]
+            w = where.get(plain)
+            names.add(plain)
+            if w and w["place"] == "home" and idle > SAY_SEC:   # 집에서 메신저로 말한 사람: 말하는 동안만 잠깐
+                continue
+            target = "entrance" if (not w and (now - g["first"] < ENTER_SEC or idle > STAY_SEC)) else "office"
+            out.append({"id": "dc_" + hashlib.md5(key.encode("utf-8")).hexdigest()[:12], "kind": "discord", "name": g["name"],
+                        "job": (w or {}).get("activity", ""), "call": "", "post": "entrance", "look": 61 + g["slot"] * 3, "target": target, "slot": g["slot"],
+                        "place": (w or {}).get("place", "meeting") if not (w and w["place"] == "home") else "meeting", "where": (w or {}).get("location", ""),
                         "say": g["say"] if now - g["say_t"] < SAY_SEC else "", "book": "", "book_title": ""})
-    return out[:MAX_GUESTS]
+    for i, (name, w) in enumerate(sorted(where.items())):   # 말은 안 했지만 어디 있는지 아는 사람
+        if name in names or w["place"] == "home" or len(out) >= MAX_PEOPLE:
+            continue
+        hid = hashlib.md5(name.encode("utf-8")).hexdigest()
+        out.append({"id": "wh_" + hid[:12], "kind": "discord", "name": tag + name, "job": w.get("activity", ""), "call": "", "post": "entrance",
+                    "look": 61 + (int(hid[:4], 16) % 40) * 3, "target": "office", "slot": 100 + i, "place": w["place"], "where": w.get("location", ""),
+                    "say": "", "book": "", "book_title": ""})
+    return out[:MAX_PEOPLE]
 
 
 def start():

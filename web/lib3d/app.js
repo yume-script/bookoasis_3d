@@ -1836,7 +1836,7 @@
   function addPixivRoom(w) {
     PIXIV_R = null;
     var bn = PIXIV.enabled && PIXIV.building, info = bn && SHOPS[bn];
-    if (!info || [STREET.gallery, STREET.jazz, STREET.office].indexOf(bn) >= 0) return;
+    if (!info || [STREET.gallery, STREET.jazz, STREET.office, STREET.cafe].indexOf(bn) >= 0) return;
     var wallM = new T.MeshStandardMaterial({ color: 0xf1eee8, roughness: 0.95, side: T.DoubleSide });
     var floorM = new T.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.4 });
     var R = shopRoom(info, w, { label: bn + ' 픽시브 랭킹 전시관 · 액자를 누르면 픽시브 작품 페이지', wall: wallM, floor: floorM,
@@ -1886,7 +1886,7 @@
     el('l3d-px-on').checked = !!P0.on; el('l3d-px-viewers').checked = !!P0.viewers; el('l3d-px-safe').checked = P0.safe !== false;
     el('l3d-px-limit').value = P0.limit || 24;
     el('l3d-px-cookie').value = ''; el('l3d-px-cookie').placeholder = P0.cookie_set ? '저장됨 - 바꿀 때만 입력' : '없음 (넣어야 그림이 나옵니다)';
-    var used = [STREET.gallery, STREET.jazz, STREET.office], names = (STREET.signs || []).filter(function (n) { return used.indexOf(n) < 0; });
+    var used = [STREET.gallery, STREET.jazz, STREET.office, STREET.cafe], names = (STREET.signs || []).filter(function (n) { return used.indexOf(n) < 0; });
     if (P0.building && names.indexOf(P0.building) < 0) names.unshift(P0.building);
     function fill(sel, rows, val) { sel.textContent = ''; rows.forEach(function (r) { var o = document.createElement('option'); o.value = r[0]; o.textContent = r[1]; sel.appendChild(o); }); sel.value = val; }
     fill(el('l3d-px-building'), names.map(function (n) { return [n, n + (SHOPS[n] ? '' : ' (지금 거리에 없음)')]; }), P0.building || '');
@@ -1908,6 +1908,77 @@
   }
   el('l3d-px-save').addEventListener('click', function () { pixivSave(); });
   el('l3d-px-clear').addEventListener('click', function () { pixivSave({ phpsessid: '', clear_cookie: true }); });
+  // ── 카페: 길 건너 [거리] 설정의 카페 건물 1층 - 계산대·커피 기계·차림판·둥근 탁자. 바깥 인물이 "카페·식당에 있다"면 여기 앉는다 ──
+  var CAFE = null;
+  function addCafe(w) {
+    CAFE = null;
+    var cn = STREET.cafe, info = cn && SHOPS[cn];
+    if (!info || [STREET.gallery, STREET.jazz, STREET.office].indexOf(cn) >= 0 || (PIXIV.enabled && PIXIV.building === cn)) return;
+    var wallM = new T.MeshStandardMaterial({ color: 0xefe6d6, roughness: 0.95, side: T.DoubleSide });
+    var floorM = new T.MeshStandardMaterial({ map: oakTex, color: 0xb98f63, roughness: 0.6 });
+    var R = shopRoom(info, w, { label: cn + ' 카페 · 빈 의자에 앉아 쉬어 가세요', wall: wallM, floor: floorM, sign: [cn, 'COFFEE · TEA · 들어오세요'], signBg: '#3b2a20', signFg: '#f4e7d0' });
+    if (!R) return;
+    CAFE = { room: R, seats: [], door: { x: R.fx + R.s * 1.0, z: R.z, rot: R.inRot } };
+    var s = R.s, gy = R.gy, z = R.z;
+    function P(d, lat, y) { return new T.Vector3(R.kx - s * d, gy + (y || 0), z + lat); }
+    function boxAt(mat, sx, sy, sz, p) { var m = new T.Mesh(unitBox, mat); m.scale.set(sx, sy, sz); m.position.copy(p); m.rotation.y = R.inRot; m.castShadow = true; parent.add(m); return m; }
+    var wood = new T.MeshStandardMaterial({ color: 0x6b4a30, roughness: 0.6 }), dark = new T.MeshStandardMaterial({ color: 0x1f2226, roughness: 0.5 }),
+        steel = new T.MeshStandardMaterial({ color: 0xb9bcc0, roughness: 0.3, metalness: 0.8 }), cream = new T.MeshStandardMaterial({ color: 0xf4efe6, roughness: 0.6 });
+    var cw = Math.min(5.2, R.bw - 3);
+    boxAt(wood, cw, 1.02, 0.75, P(1.5, 0, 0.51)); boxAt(cream, cw + 0.1, 0.05, 0.85, P(1.5, 0, 1.05));                 // 계산대
+    boxAt(steel, 0.7, 0.5, 0.5, P(1.45, -cw / 2 + 0.7, 1.33)); boxAt(dark, 0.5, 0.08, 0.3, P(1.7, -cw / 2 + 0.7, 1.12));   // 커피 기계
+    [-0.15, 0.15].forEach(function (o) { var hd = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.12, 8), dark); hd.position.copy(P(1.72, -cw / 2 + 0.7 + o, 1.2)); parent.add(hd); });
+    boxAt(steel, 0.3, 0.42, 0.3, P(1.45, -cw / 2 + 1.5, 1.29));                                                         // 그라인더
+    var glassM = new T.MeshStandardMaterial({ color: 0xdfeaf2, roughness: 0.05, transparent: true, opacity: 0.25, depthWrite: false });
+    boxAt(glassM, 1.3, 0.45, 0.55, P(1.5, cw / 2 - 0.9, 1.3)); boxAt(cream, 1.3, 0.03, 0.55, P(1.5, cw / 2 - 0.9, 1.085));   // 케이크 진열장
+    [[-0.35, 0xe9c9a0], [0, 0xf4efe6], [0.35, 0x8a5a3c]].forEach(function (q) { var ck = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.1, 16), new T.MeshStandardMaterial({ color: q[1], roughness: 0.7 })); ck.position.copy(P(1.5, cw / 2 - 0.9 + q[0], 1.16)); parent.add(ck); });
+    boxAt(dark, 0.28, 0.22, 0.22, P(1.5, 0.3, 1.19));                                                                    // 계산기
+    for (var cu = 0; cu < 6; cu++) { var cup = new T.Mesh(new T.CylinderGeometry(0.04, 0.032, 0.09, 12), FURN.ceramic); cup.position.copy(P(1.3, -0.9 + cu * 0.13, 1.12 + (cu % 2) * 0.09)); parent.add(cup); }
+    var menu = new T.Mesh(new T.PlaneGeometry(Math.min(4.2, R.bw - 4), 1.0), new T.MeshBasicMaterial({ map: textTex(['COFFEE   TEA   CAKE', 'Americano · Latte · Earl Grey · Cheesecake'], 1600, 380, '#26201b', '#f4e7d0', 110), toneMapped: false }));
+    menu.rotation.y = R.inRot; menu.position.copy(P(0.03, 0, 2.35)); parent.add(menu);
+    boxAt(wood, Math.min(4.2, R.bw - 4), 0.05, 0.3, P(0.2, 0, 1.7));                                                     // 뒤 선반 + 병·봉지
+    for (var jr = 0; jr < 9; jr++) { var jar = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 0.2, 10), new T.MeshStandardMaterial({ color: [0x7a4a2c, 0xd9c7a6, 0x3f5c47, 0xb5793e][jr % 4], roughness: 0.5 })); jar.position.copy(P(0.2, -1.6 + jr * 0.4, 1.83)); parent.add(jar); }
+    // 둥근 탁자: 의자 셋 (둘은 바깥 인물 자리, 하나는 누구나 앉는 자리) + 위에 등
+    var tabs = [], dMax = Math.min(R.bd - 2.4, 8.2), latMax = R.bw / 2 - 2.0;
+    [[3.9, -latMax], [3.9, 0], [3.9, latMax], [dMax, -latMax * 0.5], [dMax, latMax * 0.5], [(3.9 + dMax) / 2 + 0.3, -latMax], [(3.9 + dMax) / 2 + 0.3, latMax]].forEach(function (q) {
+      if (q[0] > R.bd - 2.2 || tabs.some(function (t) { return Math.hypot(t[0] - q[0], t[1] - q[1]) < 2.3; })) return;
+      tabs.push(q);
+    });
+    var topGeo = new T.CylinderGeometry(0.45, 0.45, 0.04, 24), stemGeo = new T.CylinderGeometry(0.035, 0.035, 0.7, 10), footGeo = new T.CylinderGeometry(0.26, 0.28, 0.03, 20);
+    var cSeat = rbox(0.42, 0.05, 0.42, 0.02), cBack = rbox(0.42, 0.4, 0.04, 0.02), cLeg = new T.CylinderGeometry(0.015, 0.015, 0.44, 6);
+    tabs.forEach(function (q, ti) {
+      var c = P(q[0], q[1], 0);
+      var top = new T.Mesh(topGeo, FURN.walnut); top.position.set(c.x, gy + 0.74, c.z); top.castShadow = true; parent.add(top);
+      var stem = new T.Mesh(stemGeo, M.black); stem.position.set(c.x, gy + 0.37, c.z); parent.add(stem);
+      var foot = new T.Mesh(footGeo, M.black); foot.position.set(c.x, gy + 0.015, c.z); parent.add(foot);
+      var mug = new T.Mesh(new T.CylinderGeometry(0.04, 0.035, 0.08, 12), FURN.ceramic); mug.position.set(c.x + 0.15, gy + 0.8, c.z + 0.1); parent.add(mug);
+      var vz = new T.Mesh(new T.CylinderGeometry(0.03, 0.04, 0.12, 10), steel); vz.position.set(c.x - 0.1, gy + 0.82, c.z - 0.12); parent.add(vz);
+      var fl = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), new T.MeshStandardMaterial({ color: [0xe98a9c, 0xf2c14e, 0xf4f1ea][ti % 3] })); fl.position.set(c.x - 0.1, gy + 0.93, c.z - 0.12); parent.add(fl);
+      var cord = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, R.H - 2.3, 4), M.black); cord.position.set(c.x, gy + R.H - (R.H - 2.3) / 2, c.z); parent.add(cord);   // 탁자 위 등
+      var sh = new T.Mesh(new T.CylinderGeometry(0.1, 0.24, 0.2, 18, 1, true), FURN.shadeOn); sh.position.set(c.x, gy + 2.2, c.z); parent.add(sh);
+      [0.5, 2.6, 4.7].forEach(function (a, ci) {
+        var cx = c.x + Math.sin(a) * 0.85, cz2 = c.z + Math.cos(a) * 0.85, rot = a + Math.PI, g = new T.Group(); g.position.set(cx, gy, cz2); g.rotation.y = rot; parent.add(g);
+        part(g, cSeat, wood, 0, 0.45, 0); part(g, cBack, wood, 0, 0.68, -0.2, -0.12);
+        [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].forEach(function (l) { part(g, cLeg, M.black, l[0], 0.22, l[1]); });
+        if (ci < 2) CAFE.seats.push({ x: cx, z: cz2, rot: rot }); else addSeat(cx, cz2, rot, 0.47);
+      });
+    });
+    plant(R.fx + s * 0.9, z - R.bw / 2 + 0.8, 1.1, 71); plant(R.fx + s * 0.9, z + R.bw / 2 - 0.8, 1.0, 73);
+  }
+  // 바깥 인물(디스코드에서 온 사람)이 말한 장소 → 3D 서재의 자리. idx는 같은 곳에 있는 사람 중 몇 번째인지
+  function whereSpot(place, idx) {
+    var L = layout, seat = null, list;
+    if ((place === 'book' || place === 'video') && OFFICE && (list = OFFICE[place]) && idx < list.length) seat = list[idx];
+    else if ((place === 'cafe' || place === 'eat') && CAFE && CAFE.seats.length) seat = CAFE.seats[idx % CAFE.seats.length];
+    else if (place === 'library') { var lq = placePos('lounge'); return { pos: [lq[0] + ((idx % 4) - 1.5) * 1.1, lq[1] + Math.floor(idx / 4) * 1.2 - 0.6], face: lq[2] }; }
+    else if (place === 'camp' && RV && RV.fire) { var ca = 0.9 + idx * 0.75; return { pos: [RV.fire.x + Math.sin(ca) * 3.3, RV.fire.z + Math.cos(ca) * 3.3], face: ca + Math.PI }; }
+    else if (place === 'street' || (place === 'camp') || ((place === 'cafe' || place === 'eat') && !CAFE)) {
+      return { pos: [((idx % 6) - 2.5) * 1.5, L.front + 4.6 + Math.floor(idx / 6) * 1.6], face: (idx % 2 ? 0.4 : -0.4) + Math.PI };   // 서재 앞마당에 서서 (강 쪽을 보고)
+    }
+    if (seat) return { pos: [seat.x, seat.z], face: seat.rot, sit: true };
+    if (OFFICE && OFFICE.seats && OFFICE.seats.length) { var ms = OFFICE.seats[idx % OFFICE.seats.length]; return { pos: [ms.x, ms.z], face: ms.rot, sit: true }; }   // 회의 탁자 (모르는 곳·자리가 다 찼을 때)
+    return null;
+  }
   // ── 재즈 청음실: 길 건너 [거리] 설정의 청음실 건물 1층 - 스피커·앰프·턴테이블·LP 선반·네온, 벽 화면에 지금 곡과 스펙트럼 ──
   // 인터넷 재즈 라디오 3곳(colaiuta77/jazzradio 참고)을 서버가 이어 준다. 소리는 고른 사람에게만, 청음실에서 멀어질수록 작아진다.
   var JZ = { room: null, audio: null, ctx: null, an: null, gain: null, data: null, st: '', playing: false, vol: 0.8, now: null, bars: null, platter: null,
@@ -2198,6 +2269,37 @@
       for (var k5 = 0; k5 < 5; k5++) { var an = k5 * Math.PI * 2 / 5; part(g1, spokeGeo, M.pole, Math.sin(an) * 0.15, 0.1, Math.cos(an) * 0.15, 0, an, 0); part(g1, casterGeo, dark, Math.sin(an) * 0.3, 0.035, Math.cos(an) * 0.3); }
       OFFICE.seats.push({ x: p1.x, z: p1.z, rot: rot });
     }); });
+    // 책상 섬 둘: 왼쪽(문에서 보아) 편집국 - 원고와 책 더미 / 오른쪽 영상팀 - 모니터 둘, 촬영 장비. 바깥 인물이 "편집국·영상팀에 있다"면 여기 앉는다
+    OFFICE.book = []; OFFICE.video = [];
+    var deskRows = [3.4, 4.9, 6.4, 7.9].filter(function (d0) { return d0 <= R.bd - 3.3; }), deskLat = Math.min(3.9, R.bw / 2 - 1.9);
+    var scrM = new T.MeshBasicMaterial({ color: 0x8fb8de, toneMapped: false }), scrV = new T.MeshBasicMaterial({ color: 0x2b3a52, toneMapped: false });
+    [-1, 1].forEach(function (sd) {
+      var video = sd > 0, list = video ? OFFICE.video : OFFICE.book;
+      var signT = textTex([video ? '영상팀' : '편집국'], 700, 200, video ? '#1d2a3a' : '#5b3f2a', '#ffffff', 120);
+      var sg = new T.Mesh(new T.PlaneGeometry(1.5, 0.42), new T.MeshBasicMaterial({ map: signT, toneMapped: false })); sg.position.copy(P(deskRows.length ? deskRows[0] + 1.2 : 4.5, sd * (R.bw / 2 - 0.05), 2.75)); sg.rotation.y = sd > 0 ? Math.PI : 0; parent.add(sg);
+      deskRows.forEach(function (d0, di) {
+        boxAt(wood, 0.72, 0.05, 1.3, P(d0, sd * deskLat, 0.735)); boxAt(dark, 0.68, 0.7, 0.04, P(d0 - 0.62, sd * deskLat, 0.36)); boxAt(dark, 0.68, 0.7, 0.04, P(d0 + 0.62, sd * deskLat, 0.36));
+        boxAt(dark, 0.04, 0.34, 0.58, P(d0 + (video ? 0.3 : 0), sd * (deskLat + 0.22), 1.05)); boxAt(dark, 0.14, 0.02, 0.2, P(d0 + (video ? 0.3 : 0), sd * (deskLat + 0.22), 0.77));
+        var sc0 = new T.Mesh(new T.PlaneGeometry(0.54, 0.3), video ? scrV : scrM); sc0.position.copy(P(d0 + (video ? 0.3 : 0), sd * (deskLat + 0.195), 1.05)); sc0.rotation.y = sd > 0 ? Math.PI : 0; parent.add(sc0);
+        if (video) { boxAt(dark, 0.04, 0.34, 0.58, P(d0 - 0.33, sd * (deskLat + 0.2), 1.05)).rotation.y = R.inRot + 0.25;   // 모니터 둘째 + 편집 타임라인
+          var tl = new T.Mesh(new T.PlaneGeometry(0.5, 0.06), new T.MeshBasicMaterial({ color: 0xe0a43a, toneMapped: false })); tl.position.copy(P(d0 + 0.3, sd * (deskLat + 0.19), 0.96)); tl.rotation.y = Math.PI; parent.add(tl); }
+        else { for (var pk = 0; pk < 3 + di; pk++) boxAt(paper, 0.22, 0.012 + pk * 0.002, 0.3, P(d0 - 0.4, sd * (deskLat + 0.05), 0.77 + pk * 0.016)).rotation.y = R.inRot + pk * 0.2;   // 원고 더미
+          for (var bk0 = 0; bk0 < 3; bk0++) boxAt(new T.MeshStandardMaterial({ color: PALETTE[(di * 3 + bk0) % PALETTE.length], roughness: 0.6 }), 0.16, 0.035, 0.23, P(d0 + 0.45, sd * (deskLat - 0.1), 0.78 + bk0 * 0.036)); }
+        var cupD = new T.Mesh(new T.CylinderGeometry(0.035, 0.03, 0.09, 12), FURN.ceramic); cupD.position.copy(P(d0 - 0.15, sd * (deskLat - 0.2), 0.805)); parent.add(cupD);
+        var cp = P(d0, sd * (deskLat - 0.78), 0), cg = new T.Group(), crot = sd > 0 ? 0 : Math.PI; cg.position.copy(cp); cg.rotation.y = crot; parent.add(cg);   // 의자 (책상을 보고)
+        part(cg, seatGeoC, dark, 0, 0.47, 0); part(cg, backGeoC, dark, 0, 0.82, -0.24, -0.1); part(cg, new T.CylinderGeometry(0.025, 0.025, 0.42, 8), M.pole, 0, 0.22, 0);
+        part(cg, new T.CylinderGeometry(0.28, 0.28, 0.03, 5), M.pole, 0, 0.03, 0);
+        list.push({ x: cp.x, z: cp.z, rot: crot });
+      });
+      if (video && deskRows.length) {   // 촬영 장비: 삼각대 카메라 + 조명
+        var tp = P(deskRows[deskRows.length - 1] + 1.3, sd * (deskLat + 0.2), 0);
+        [0, 2.1, 4.2].forEach(function (a) { var lg = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 1.25, 6), M.pole); lg.position.set(tp.x + Math.sin(a) * 0.2, gy + 0.6, tp.z + Math.cos(a) * 0.2); lg.rotation.set(Math.cos(a) * 0.3, 0, -Math.sin(a) * 0.3); parent.add(lg); });
+        var cam = new T.Mesh(unitBox, dark); cam.scale.set(0.16, 0.14, 0.26); cam.position.set(tp.x, gy + 1.28, tp.z); parent.add(cam);
+        var lens = new T.Mesh(new T.CylinderGeometry(0.05, 0.06, 0.12, 12), dark); lens.rotation.x = Math.PI / 2; lens.position.set(tp.x, gy + 1.28, tp.z - sd * 0.18); parent.add(lens);
+        var lp = P(deskRows[0] - 0.9, sd * (deskLat + 0.3), 0); var st0 = new T.Mesh(new T.CylinderGeometry(0.015, 0.015, 1.7, 6), M.pole); st0.position.set(lp.x, gy + 0.85, lp.z); parent.add(st0);
+        var box0 = new T.Mesh(unitBox, FURN.shadeOn); box0.scale.set(0.5, 0.5, 0.12); box0.position.set(lp.x, gy + 1.75, lp.z); box0.rotation.y = 0.5; parent.add(box0);
+      }
+    });
     // 책장 (옆 벽) + 소파·탁자 (앞쪽) + 화분
     [-1, 1].forEach(function (sd) {
       var bx0 = R.bx + s * 0.3, zz = z + sd * (R.bw / 2 - 0.25);
@@ -2227,6 +2329,7 @@
     addJazzRoom(w);              // 길 건너 재즈 청음실 ([거리] 설정)
     addOffice(w);                // 길 건너 왼쪽 사무실 ([거리] 설정)
     addPixivRoom(w);             // 길 건너 픽시브 랭킹 전시관 ([픽시브] 설정)
+    addCafe(w);                  // 길 건너 카페 ([거리] 설정의 카페 건물)
     // 안쪽·바깥 매트
     [front - 1.1, front + 1.1].forEach(function (mz) { var mat = new T.Mesh(new T.PlaneGeometry(3.2, 1.6), new T.MeshStandardMaterial({ color: 0x2b2d30, roughness: 1 })); mat.rotation.x = -Math.PI / 2; add(mat, 0, 0.015, mz); });
     // 앞마당 (보도블록) - 양옆 보도와 이어진다
@@ -4285,13 +4388,13 @@
   // [거리]: 길 건너 간판 이름과 갤러리·청음실·사무실·현수막 건물
   function streetForm() {
     el('l3d-st-signs').value = (STREET.signs || []).join('\n');
-    ['gallery', 'jazz', 'office'].forEach(function (k) { el('l3d-st-' + k).value = STREET[k] || ''; });
+    ['gallery', 'jazz', 'office', 'cafe'].forEach(function (k) { el('l3d-st-' + k).value = STREET[k] || ''; });
     var sel = el('l3d-st-banner'), names = [STREET.gallery, STREET.jazz, STREET.office].concat(STREET.signs || []).filter(function (n, i, a) { return n && a.indexOf(n) === i; });
     sel.textContent = ''; [''].concat(names).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n || '없음'; sel.appendChild(o); });
     sel.value = STREET.banner || '';
   }
   el('l3d-st-save').addEventListener('click', function () {
-    var body = { signs: el('l3d-st-signs').value, gallery: el('l3d-st-gallery').value, jazz: el('l3d-st-jazz').value, office: el('l3d-st-office').value, banner: el('l3d-st-banner').value };
+    var body = { signs: el('l3d-st-signs').value, gallery: el('l3d-st-gallery').value, jazz: el('l3d-st-jazz').value, office: el('l3d-st-office').value, cafe: el('l3d-st-cafe').value, banner: el('l3d-st-banner').value };
     el('l3d-out-msg').textContent = '저장 중...';
     postJSON('api/lib3d/settings', { street: body }).then(function (d) {
       STREET = d.street; streetForm();
@@ -5893,7 +5996,7 @@
       if (staffData.some(function (s) { return s.id === k; })) return;
       var gone = staffNPC[k]; if (gone.g.parent) gone.g.parent.remove(gone.g); disposeGroup(gone.g); delete staffNPC[k];
     });
-    var ROOMPOST = { office: 1, gallery: 1, jazz: 1 };
+    var ROOMPOST = { office: 1, gallery: 1, jazz: 1 }, whereCount = {};
     staffData.forEach(function (s) {
       if (ROOMPOST[s.post] && !placePos(s.post) && (!s.target || ROOMPOST[s.target] && !placePos(s.target))) {   // 길 건너 사람: 자기 공간이 없는 층(2층부터)에는 안 보인다
         if (staffNPC[s.id]) { var q0 = staffNPC[s.id]; if (q0.g.parent) q0.g.parent.remove(q0.g); disposeGroup(q0.g); delete staffNPC[s.id]; }
@@ -5916,20 +6019,23 @@
         var q = placePos(s.target); if (q) { pos = [q[0], q[1]]; face = q[2]; }
       }
       if (!pos && s.target !== 'book') { var h = placePos(s.post) || placePos('lobby'); pos = [h[0], h[1]]; face = h[2]; }
-      if (s.kind === 'discord') {   // 디스코드에서 온 사람: 길 건너 사무실 회의 탁자 의자에 앉는다 (사무실이 없으면 라운지에 나란히)
-        var sl = s.slot || 0; p.seatRot = null;
-        if (OFFICE && OFFICE.seats && OFFICE.seats.length) {
-          if (s.target === 'entrance') { pos = [OFFICE.door.x, OFFICE.door.z + ((sl % 3) - 1) * 0.5]; face = OFFICE.door.rot; }   // 들어오고 나갈 때는 사무실 문
-          else { var seat = OFFICE.seats[sl % OFFICE.seats.length]; pos = [seat.x, seat.z]; face = seat.rot; p.seatRot = seat.rot; }
-          if (p.fresh) { p.fresh = false; p.g.position.set(OFFICE.door.x, 0, OFFICE.door.z); }
-        } else {
-          if (s.target !== 'entrance') { var lq = placePos('lounge'); pos = [lq[0], lq[1]]; face = lq[2]; }
-          if (pos) pos = [pos[0] + ((sl % 4) - 1.5) * 1.1, pos[1] + Math.floor(sl / 4) * 1.2 - 0.6];
+      if (s.kind === 'discord') {   // 디스코드에서 온 사람: 지금 있다는 곳(place)의 자리로 - 편집국·영상팀 책상, 회의 탁자, 카페, 라운지, 앞마당, 캠핑장
+        var sl = s.slot || 0, place = s.place || 'meeting'; p.seatRot = null;
+        var hasOffice = OFFICE && OFFICE.seats && OFFICE.seats.length;
+        if (s.target === 'entrance' && hasOffice) { pos = [OFFICE.door.x, OFFICE.door.z + ((sl % 3) - 1) * 0.5]; face = OFFICE.door.rot; }   // 들어오고 나갈 때는 사무실 문
+        else if (s.target !== 'entrance') {
+          var grp = ((place === 'book' || place === 'video') && OFFICE && OFFICE[place] && (whereCount[place] || 0) < OFFICE[place].length) ? place
+            : (place === 'book' || place === 'video' || place === 'meeting') ? 'meeting' : place;
+          var widx = whereCount[grp] = (whereCount[grp] || 0) + 1, spot = whereSpot(grp, widx - 1);
+          if (spot) { pos = spot.pos; face = spot.face; if (spot.sit) p.seatRot = spot.face; }
+          else { var lq2 = placePos('lounge'); pos = [lq2[0] + ((sl % 4) - 1.5) * 1.1, lq2[1] + Math.floor(sl / 4) * 1.2 - 0.6]; face = lq2[2]; }
         }
+        if (p.fresh) { p.fresh = false; if (hasOffice && !s.where) p.g.position.set(OFFICE.door.x, 0, OFFICE.door.z); else if (pos) p.g.position.set(pos[0], 0, pos[1]); }   // 위치를 아는 사람은 처음부터 그 자리에
       }
       if (pos) { p.tx = pos[0]; p.tz = pos[1]; p.face = face; }   // 이 화면에 없는 책이면 그 자리에 머문다
       var say = s.say || '';
-      if (say !== (p.lastSay || '')) { p.lastSay = say; setStaffTag(p, s, say); }
+      var tagKey = say + '|' + (s.job || '');
+      if (tagKey !== (p.lastSay || '|')) { p.lastSay = tagKey; setStaffTag(p, s, say); }   // 말이나 하는 일이 바뀌면 이름표를 다시
     });
     if (pointer && !staffData.some(function (s) { return s.kind !== 'guest' && s.target === 'book' && s.book === pointer.key; })) hidePointer();
     drawBoard(d.board || {}, d.log || []);

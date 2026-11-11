@@ -79,8 +79,8 @@ def save(body):
         except (TypeError, ValueError):
             raise ValueError("그림 수는 숫자로 적어 주세요.")
     street = lib3d.street()
-    if cur["enabled"] and cur["building"] in [street[k] for k in ("gallery", "jazz", "office") if street[k]]:
-        raise ValueError("'%s' 건물은 이미 다른 공간(갤러리·청음실·사무실)이 쓰고 있습니다." % cur["building"])
+    if cur["enabled"] and cur["building"] in [street[k] for k in ("gallery", "jazz", "office", "cafe") if street.get(k)]:
+        raise ValueError("'%s' 건물은 이미 다른 공간(갤러리·청음실·사무실·카페)이 쓰고 있습니다." % cur["building"])
     value = " ".join(str(body.get("phpsessid") or "").split())
     if value:
         if not re.fullmatch(r"[\w\-]{8,200}", value):

@@ -75,6 +75,28 @@ class ActivityTest(unittest.TestCase):
         self.assertEqual(act.poll_bookoasis(), 0)
         self.assertEqual(act.poll_bookoasis(), 0)
 
+    def test_where_places(self):
+        from boa3d import lib3d_discord as dc, lib3d_where as wh
+        cases = {"ZEEPS 편집국": "book", "편집국 자리에서 원고 교정": "book", "영상팀 편집실": "video", "스튜디오": "video", "카페 오후세시": "cafe",
+                 "솥뚜껑 주점": "eat", "회의실": "meeting", "영상팀 회의실": "meeting", "BookOasis 3D 서재": "library", "공원 산책": "street",
+                 "집": "home", "집에서 쉬는 중": "home", "우리 집 거실": "home", "강가 캠핑장": "camp", "어딘가": "street"}
+        for loc, want in cases.items():
+            self.assertEqual(wh.place_of(loc), want, loc)
+        self.assertEqual(wh.place_of("자리", company="ZEEPS 영상콘텐츠팀"), "video")      # 모르는 곳이면 소속으로
+        self.assertEqual(wh.place_of("자리", company="ZEEPS 편집국"), "book")
+        self.assertEqual(wh.place_of("편집국", state="자는 중"), "home")
+        wh._PEOPLE.clear()
+        dc._GUESTS.clear()
+        self.assertEqual(wh.update([{"name": "애순이", "location": "ZEEPS 편집국", "activity": "원고 검토", "state": "일하는 중"},
+                                    {"name": "소라", "location": "카페 오후세시", "activity": "커피 내리기"},
+                                    {"name": "문하늘", "location": "집", "state": "자는 중"}, {"location": "이름 없음"}], now=1000), 3)
+        os.environ["LIB3D_DISCORD_LABEL"] = "출판사"
+        self.addCleanup(os.environ.pop, "LIB3D_DISCORD_LABEL", None)
+        got = {g["name"]: (g["place"], g["job"], g["target"]) for g in dc.public(now=1010)}
+        self.assertEqual(got, {"[출판사] 애순이": ("book", "원고 검토", "office"), "[출판사] 소라": ("cafe", "커피 내리기", "office")})   # 집에 있는 사람은 안 보인다
+        self.assertEqual(dc.public(now=1000 + wh.KEEP_SEC + 5), [])                       # 오래된 소식은 믿지 않는다
+        wh._PEOPLE.clear()
+
     def test_plex_and_ymp(self):
         os.environ.update({"LIB3D_PLEX_URL": "http://plex.test:32400", "LIB3D_PLEX_TOKEN": "tok", "LIB3D_YMPLAYER_URL": "http://ymp.test",
                            "LIB3D_YMPLAYER_MCP_TOKEN": "ymp_x"})

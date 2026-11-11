@@ -26,7 +26,7 @@ import zipfile
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_activity, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_pixiv, lib3d_presence, lib3d_ymp
+from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_activity, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_pixiv, lib3d_presence, lib3d_where, lib3d_ymp
 
 log = logging.getLogger("boa3d.web")
 WEB_DIR = os.path.join(config.ROOT, "web")
@@ -442,7 +442,8 @@ class Handler(BaseHTTPRequestHandler):
     def _events(self):
         """POST /api/lib3d/events - Authorization: Bearer <LIB3D_EVENT_TOKEN>. 바깥 프로그램(디스코드 봇 등)이 3D 서재에 알린다.
           {"type": "delivery", "from": "배달원 이름", "items": [{"title": "제목", "kind": "book|webtoon|video|audio|comic"}], "note": "할 말"}
-          {"type": "say", "agent": "boss", "text": "할 말", "place": "office"}   (직원 id, 장소는 넣지 않아도 됨)"""
+          {"type": "say", "agent": "boss", "text": "할 말", "place": "office"}   (직원 id, 장소는 넣지 않아도 됨)
+          {"type": "where", "people": [{"name": "이름", "location": "지금 있는 곳", "activity": "하는 일", "state": "상태", "company": "소속"}]}"""
         if not config.env("LIB3D_EVENT_TOKEN", "").strip():
             return self._send(404, {"success": False, "error": "3D 서재 이벤트 받기가 꺼져 있습니다 (.env의 LIB3D_EVENT_TOKEN)."})
         if not lib3d_events.token_ok(self.headers.get("Authorization")):
@@ -469,7 +470,11 @@ class Handler(BaseHTTPRequestHandler):
             if kind == "say":
                 lib3d_agents.remote_act(str(body.get("agent") or ""), " ".join(str(body.get("text") or "").split())[:160], str(body.get("place") or ""))
                 return self._send(200, {"success": True})
-            return self._send(400, {"success": False, "error": "type은 delivery·say 중 하나입니다."})
+            if kind == "where":   # 바깥 인물들이 지금 어디서 무엇을 하는지 → 3D 서재의 자리
+                if not isinstance(body.get("people"), list):
+                    return self._send(400, {"success": False, "error": "people은 [{name, location, activity, state, company}] 목록이어야 합니다."})
+                return self._send(200, {"success": True, "count": lib3d_where.update(body["people"])})
+            return self._send(400, {"success": False, "error": "type은 delivery·say·where 중 하나입니다."})
         except ValueError as e:
             return self._send(400, {"success": False, "error": str(e)})
 

@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 
 from . import bookoasis_db, config
 
-VERSION = "2.61.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
+VERSION = "2.62.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
 CACHE_SEC = 300
 COVER_WIDTH = 200
 _DATA = {"at": 0.0, "v": None}
@@ -189,6 +189,7 @@ STREET_DEFAULT = {
     "jazz": "RECORDS",       # 1층이 재즈 청음실인 건물 (길 오른쪽)
     "office": "OFFICE",      # 1층이 사무실인 건물 (길 왼쪽)
     "banner": "GALLERY",     # 현수막을 거는 건물 (위 이름 중 하나)
+    "cafe": "BOOK CAFE",     # 1층이 카페인 건물 (간판 이름 중 하나 - 바깥 인물이 카페·식당에 있다고 하면 여기 앉는다)
 }
 STREET_NAME_MAX = 24
 
@@ -203,7 +204,7 @@ def street():
     out = dict(STREET_DEFAULT)
     if isinstance(st.get("signs"), list):
         out["signs"] = [n for n in (_street_name(x) for x in st["signs"]) if n][:16]
-    for k in ("gallery", "jazz", "office", "banner"):
+    for k in ("gallery", "jazz", "office", "banner", "cafe"):
         if k in st:
             out[k] = _street_name(st[k])   # 비우면 그 공간을 만들지 않는다
     return out
@@ -216,11 +217,11 @@ def save_street(body):
     if isinstance(signs, str):
         signs = re.split(r"[\n,]+", signs)
     clean = {"signs": [n for n in (_street_name(x) for x in signs or []) if n][:16]}
-    for k in ("gallery", "jazz", "office", "banner"):
+    for k in ("gallery", "jazz", "office", "banner", "cafe"):
         clean[k] = _street_name(body.get(k, cur[k]))
-    names = [clean[k] for k in ("gallery", "jazz", "office") if clean[k]]
+    names = [clean[k] for k in ("gallery", "jazz", "office", "cafe") if clean[k]]
     if len(names) != len(set(names)):
-        raise ValueError("갤러리·청음실·사무실은 서로 다른 건물 이름이어야 합니다.")
+        raise ValueError("갤러리·청음실·사무실·카페는 서로 다른 건물 이름이어야 합니다.")
     data_ = dict(load_settings(), street=clean)
     os.makedirs(config.data_dir(), exist_ok=True)
     tmp = _settings_path() + ".tmp"
