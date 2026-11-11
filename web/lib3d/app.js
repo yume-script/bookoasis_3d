@@ -1803,30 +1803,63 @@
     var wood = new T.MeshStandardMaterial({ color: 0x5a3a24, roughness: 0.6 }), dark = new T.MeshStandardMaterial({ color: 0x141414, roughness: 0.5 });
     var brass = new T.MeshStandardMaterial({ color: 0xc8a050, roughness: 0.3, metalness: 0.8 });
     function boxAt(mat, sx, sy, sz, p, hit) { var m = new T.Mesh(unitBox, mat); m.scale.set(sx, sy, sz); m.position.copy(p); m.rotation.y = R.inRot; m.castShadow = true; parent.add(m); if (hit) { m.userData.jazz = true; brunchHits.push(m); } return m; }
-    // 큰 스피커 둘
+    // 음반 가게처럼: 안쪽 벽 가득 LP 선반(화면 양옆, 바닥부터 천장까지) + 위에 줄지은 조명, 그 앞 긴 나무 작업대에 턴테이블·앰프·라디오
+    var lpW = [], lpC = [], rw = rnd(79), LPC = [0xd8c9a0, 0xc9b27a, 0xe6dcc0, 0xb89a62, 0xd9b98a, 0xcdbb8e, 0x8c6b3f, 0xa5522e, 0x3a3a3a, 0xe9e2cf];
+    var half = R.bw / 2 - 0.35, rows = 5, rh = 0.56;
     [-1, 1].forEach(function (sd) {
-      var c = P(0.45, sd * 2.7, 0.85);
-      boxAt(wood, 0.9, 1.7, 0.6, c);
-      [[0.38, 0.22], [1.0, 0.13], [1.4, 0.06]].forEach(function (cn) {
+      var a = 1.75, b = half, mid = sd * (a + b) / 2, len = b - a;
+      for (var row = 0; row <= rows; row++) boxAt(wood, len, 0.04, 0.36, P(0.2, mid, 0.14 + row * rh));                 // 선반 널
+      for (var dv = a; dv <= b + 0.01; dv += len / Math.max(2, Math.round(len / 1.25))) boxAt(wood, 0.05, rows * rh, 0.36, P(0.2, sd * dv, 0.14 + rows * rh / 2));   // 칸막이
+      for (var row2 = 0; row2 < rows; row2++) for (var lz = a + 0.06; lz < b - 0.04; lz += 0.042) {
+        if (rw() < 0.06) { lz += 0.08; continue; }   // 군데군데 빈 틈
+        var hh = 0.42 + rw() * 0.06;
+        lpW.push([R.kx - s * 0.2, gy + 0.16 + row2 * rh + hh / 2, z + sd * lz, 0.31, hh, 0.034]); lpC.push(LPC[Math.floor(Math.pow(rw(), 1.4) * LPC.length)]);
+      }
+      for (var sp = a + 0.6; sp < b; sp += 1.5) {   // 선반 위 조명
+        boxAt(dark, 0.06, 0.1, 0.06, P(0.55, sd * sp, rows * rh + 0.3));
+        var bl = new T.Mesh(new T.SphereGeometry(0.05, 10, 8), FURN.bulb); bl.position.copy(P(0.5, sd * sp, rows * rh + 0.22)); parent.add(bl);
+      }
+      boxAt(dark, len, 0.03, 0.03, P(0.55, mid, rows * rh + 0.36));   // 조명 레일
+    });
+    instBoxes(lpW, EXT.spine, lpC);
+    // 큰 스피커 둘 (작업대 양옆, 바닥에)
+    [-1, 1].forEach(function (sd) {
+      var c = P(1.0, sd * 2.75, 0.75);
+      boxAt(wood, 0.8, 1.5, 0.55, c);
+      [[0.35, 0.2], [0.9, 0.12], [1.25, 0.055]].forEach(function (cn) {
         var cone = new T.Mesh(new T.CylinderGeometry(cn[1], cn[1] * 0.7, 0.05, 24), dark); cone.rotation.z = Math.PI / 2;
-        cone.position.copy(P(0.77, sd * 2.7, cn[0])); cone.rotation.y = R.inRot + Math.PI / 2; parent.add(cone);
+        cone.position.copy(P(1.3, sd * 2.75, cn[0])); cone.rotation.y = R.inRot + Math.PI / 2; parent.add(cone);
       });
     });
-    // 턴테이블 장 + 앰프 (VU 미터)
-    boxAt(wood, 2.2, 0.8, 0.65, P(0.5, 0, 0.4), true);
+    // 긴 나무 작업대 (두꺼운 상판 + 다리 틀 + 아래 LP 상자)
+    boxAt(wood, 4.3, 0.1, 0.85, P(1.0, 0, 0.86), true);
+    [-1.9, 1.9].forEach(function (lat) { boxAt(wood, 0.1, 0.8, 0.7, P(1.0, lat, 0.41)); });
+    boxAt(wood, 3.7, 0.06, 0.1, P(1.0, 0, 0.25));
+    [-0.9, 0.7].forEach(function (lat, ci) { boxAt(wood, 0.5, 0.36, 0.42, P(1.0, lat, 0.2)); for (var k = 0; k < 9; k++) boxAt(new T.MeshStandardMaterial({ color: LPC[(k * 3 + ci) % LPC.length], roughness: 0.8 }), 0.035, 0.32, 0.33, P(1.0, lat - 0.2 + k * 0.05, 0.42)); });
     var vuTex = canvasTex(512, 128, function (g, cw, ch) {
       g.fillStyle = '#1a1206'; g.fillRect(0, 0, cw, ch);
       [0, 1].forEach(function (k) { var x0 = 30 + k * 250; g.fillStyle = '#f3c26b'; g.fillRect(x0, 18, 200, 92); g.strokeStyle = '#3a2a10'; g.lineWidth = 3;
         g.beginPath(); g.arc(x0 + 100, 120, 80, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); g.fillStyle = '#3a2a10'; g.font = '700 18px ' + FONT; g.fillText('VU', x0 + 88, 70); });
     });
-    var vu = new T.Mesh(new T.PlaneGeometry(1.2, 0.3), new T.MeshBasicMaterial({ map: vuTex, toneMapped: false }));
-    vu.position.copy(P(0.82, 0, 0.55)); vu.rotation.y = R.inRot; parent.add(vu);
-    boxAt(dark, 0.8, 0.12, 0.45, P(0.5, -0.4, 0.86), true);   // 턴테이블 몸통
+    boxAt(dark, 0.7, 0.2, 0.42, P(1.0, 0.55, 1.01), true);                                             // 앰프
+    var vu = new T.Mesh(new T.PlaneGeometry(0.6, 0.15), new T.MeshBasicMaterial({ map: vuTex, toneMapped: false }));
+    vu.position.copy(P(1.215, 0.55, 1.02)); vu.rotation.y = R.inRot; parent.add(vu);
+    [0.32, 0.78].forEach(function (lat) { var kn = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.03, 12), brass); kn.rotation.z = Math.PI / 2; kn.position.copy(P(1.225, lat, 0.94)); kn.rotation.y = R.inRot + Math.PI / 2; parent.add(kn); });
+    boxAt(dark, 0.62, 0.1, 0.46, P(1.0, -0.75, 0.96), true);                                           // 턴테이블 몸통
     var platter = new T.Mesh(new T.CylinderGeometry(0.17, 0.17, 0.02, 32), new T.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.3 }));
-    platter.position.copy(P(0.5, -0.45, 0.935)); platter.userData.jazz = true; brunchHits.push(platter); parent.add(platter);
+    platter.position.copy(P(1.0, -0.8, 1.025)); platter.userData.jazz = true; brunchHits.push(platter); parent.add(platter);
     var label = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.022, 20), new T.MeshStandardMaterial({ color: 0xc0392b })); label.position.set(0, 0.002, 0.03); platter.add(label);
     JZ.platter = platter;
-    var arm = new T.Mesh(unitBox, brass); arm.scale.set(0.02, 0.02, 0.26); arm.position.copy(P(0.42, -0.2, 0.97)); arm.rotation.y = R.inRot + 0.5; parent.add(arm);
+    var arm = new T.Mesh(unitBox, brass); arm.scale.set(0.02, 0.02, 0.26); arm.position.copy(P(0.93, -0.56, 1.06)); arm.rotation.y = R.inRot + 0.5; parent.add(arm);
+    boxAt(new T.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.5 }), 0.42, 0.24, 0.2, P(1.0, 1.55, 1.03), true);   // 작은 흰 라디오
+    boxAt(dark, 0.2, 0.16, 0.02, P(1.105, 1.48, 1.03));
+    // 작업대에 기대 놓은 그림 둘 + 옆 나무 장
+    [[-1.65, 0x6fae6a, 0xf2c14e], [1.15, 0xe2a05a, 0x5b8fb9]].forEach(function (q) {
+      var cv = canvasTex(128, 96, function (g, cw, ch) { g.fillStyle = '#' + new T.Color(q[1]).getHexString(); g.fillRect(0, 0, cw, ch); g.fillStyle = '#' + new T.Color(q[2]).getHexString();
+        for (var k = 0; k < 14; k++) { g.beginPath(); g.arc(rw() * cw, rw() * ch, 6 + rw() * 14, 0, 6.3); g.fill(); } g.strokeStyle = '#f4efe2'; g.lineWidth = 6; g.strokeRect(3, 3, cw - 6, ch - 6); });
+      var pm = new T.Mesh(new T.PlaneGeometry(0.5, 0.38), new T.MeshBasicMaterial({ map: cv, toneMapped: false })); pm.position.copy(P(1.47, q[0], 0.62)); pm.rotation.y = R.inRot; pm.rotation.order = 'YXZ'; pm.rotation.x = -0.22; parent.add(pm);
+    });
+    boxAt(wood, 0.9, 0.9, 0.7, P(1.0, 3.75, 0.45)); boxAt(dark, 0.7, 0.6, 0.02, P(1.36, 3.75, 0.45));
     // 벽 화면: 방송국·곡·커버 + 그 아래 스펙트럼 막대
     JZ.scrTex = canvasTex(1024, 512, function (g, cw, ch) { g.fillStyle = '#100c08'; g.fillRect(0, 0, cw, ch); });
     var scr = new T.Mesh(new T.PlaneGeometry(3.0, 1.5), new T.MeshBasicMaterial({ map: JZ.scrTex, toneMapped: false }));
@@ -1853,7 +1886,7 @@
     neon.position.set(R.bx - s * 1.2, gy + 2.55, z - (R.bw / 2 - 0.05)); parent.add(neon);
     // 안락의자 셋 (화면을 보고) + 스탠드
     [-1.7, 0, 1.7].forEach(function (lat) {
-      var p0 = P(3.4, lat, 0), ch = new T.Group(); ch.position.copy(p0); ch.rotation.y = s * Math.PI / 2; parent.add(ch);
+      var p0 = P(4.3, lat, 0), ch = new T.Group(); ch.position.copy(p0); ch.rotation.y = s * Math.PI / 2; parent.add(ch);
       var seatM = new T.MeshStandardMaterial({ color: 0x7a2e22, roughness: 0.7 });
       var se = new T.Mesh(unitBox, seatM); se.scale.set(0.8, 0.2, 0.7); se.position.y = 0.42; ch.add(se);
       var bk = new T.Mesh(unitBox, seatM); bk.scale.set(0.8, 0.75, 0.16); bk.position.set(0, 0.85, -0.3); ch.add(bk);
@@ -4535,6 +4568,7 @@
     ARC_X = null; CINE_WALL = null; ROOMS = []; GALLERY_R = null; OFFICE = null; JZ.room = null; JZ.bars = null; JZ.platter = null; JZ.screen = null;   // 길 건너 방은 1층에서만 다시 만든다
     if (i !== 0 && JZ.playing) jzStop(); if (cine.video) cineStop(); cineScreen = null; if (cine.tex) { cine.tex.dispose(); cine.tex = null; }
     COLS = fl.cinema ? 3 : Math.max(2, Math.min(4, fl.libs.length));
+    brunchHits = [];
     addBuilding(fl, COLS, fl.cinema ? 1 : Math.ceil(fl.libs.length / COLS));
     applyOutside.force = true; applyOutside();
     fl.libs.forEach(function (lib, j) { addSection(lib, j); });
@@ -4799,7 +4833,7 @@
   var BR_DAYS = [['MONDAY', '월'], ['TUESDAY', '화'], ['WEDNESDAY', '수'], ['THURSDAY', '목'], ['FRIDAY', '금'], ['SATURDAY', '토'], ['SUNDAY', '일'], ['COMPLETE', '완결']];
   function brDayKo(k) { var d = BR_DAYS.filter(function (x) { return x[0] === k; })[0]; return d ? d[1] : ''; }
   function addBrunchCorner(floorIdx) {
-    brunchHits = []; brunchScreen = null; narrator = null; brunchSpot = null;
+    brunchScreen = null; narrator = null; brunchSpot = null;   // 누르는 대상 목록(brunchHits)은 buildFloor가 층을 짓기 전에 비운다 (청음실 것이 지워지지 않게)
     if (!BRUNCH_ON || !layout || floorIdx !== 0) return;   // 1층에만
     var L = layout, cx = Math.min(9.5, L.w / 2 - 6), f = L.front;
     var g = new T.Group(); g.position.set(cx, 0, 0); parent.add(g);
