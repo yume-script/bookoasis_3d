@@ -3834,6 +3834,7 @@
       fs.appendChild(head);
       var fb = document.createElement('div'); fb.className = 'fs-body'; fs.appendChild(fb);
       fb.appendChild(labeled(guest ? '방문하기' : '일하기', staffInput('input', a.enabled !== false, { type: 'checkbox', 'data-f': 'enabled' })));
+      if (!guest) fb.appendChild(labeled('혼자 돌아다니기 (끄면 일이 없을 때 제자리)', staffInput('input', a.roam !== false, { type: 'checkbox', 'data-f': 'roam' })));
       var g2 = document.createElement('div'); g2.className = 'grid2'; fb.appendChild(g2);
       g2.appendChild(labeled('이름', staffInput('input', a.name, { type: 'text', 'data-f': 'name' })));
       g2.appendChild(labeled(guest ? '소개' : '직업', staffInput('input', a.job, { type: 'text', 'data-f': 'job' })));

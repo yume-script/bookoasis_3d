@@ -638,7 +638,10 @@ class Handler(BaseHTTPRequestHandler):
                         return self._send(400, {"success": False, "error": "AI 직원과의 대화가 꺼져 있습니다 - 3D 서재 설정 > AI 설정의 'AI 직원'."})
                     lib3d_agents.talk(ag, key, question, context.get("floor"), auth.is_admin(user), auth.adult_ok(user), display=name)
                     return self._send(200, {"success": True, "ask": True})
-                return self._send(200, {"success": True, "msg": lib3d_presence.say(key, context.get("text"), context.get("floor"), name)})
+                msg = lib3d_presence.say(key, context.get("text"), context.get("floor"), name)
+                # 채팅에서 직원 이름을 부르면 (@ 없이도) 그 직원이 모두가 보는 채팅으로 답한다
+                lib3d_agents.name_call(context.get("text"), key, name, context.get("floor"), auth.is_admin(user), auth.adult_ok(user))
+                return self._send(200, {"success": True, "msg": msg})
             except ValueError as e:
                 return self._send(400, {"success": False, "error": str(e)})
         if path == "/api/lib3d/settings":  # 3D 서재 설정: 보여 줄 보관함 ({"libraries": [키…] 또는 null=전부})

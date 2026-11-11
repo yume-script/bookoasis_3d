@@ -191,8 +191,9 @@ def _text(m):
     return t[:lib3d_presence.CHAT_MAX_LEN]
 
 
-def _arrive(key, name, text):
-    """디스코드에서 한 말 → 1층 채팅 + 1층 라운지 손님"""
+def _arrive(key, name, text, human=False):
+    """디스코드에서 한 말 → 1층 채팅 + 1층 라운지 손님. 사람이 서재 AI 직원의 이름을 부르면 그 직원이 답한다
+    (봇·웹후크 글에는 답하지 않는다 - 봇끼리 끝없이 주고받지 않게. 바깥 AI가 맡은 직원도 빼서 디스코드 쪽 답과 겹치지 않게)"""
     now = time.time()
     shown = "[%s] %s" % (label(), name)
     from . import lib3d_agents   # 1층(일반 층)에 - 순환 import를 피해 여기서
@@ -211,6 +212,11 @@ def _arrive(key, name, text):
         if len(_GUESTS) > MAX_GUESTS * 3:
             for k in sorted(_GUESTS, key=lambda k: _GUESTS[k]["last"])[:len(_GUESTS) - MAX_GUESTS * 3]:
                 _GUESTS.pop(k, None)
+    if human:
+        try:
+            lib3d_agents.name_call(text, "discord:%s" % key, shown, ground, skip_remote=True)
+        except Exception as e:  # noqa: BLE001 - 답을 못 해도 받기는 계속
+            log.warning("디스코드 이름 응답 실패: %s", e)
 
 
 def _resolve_channel():
@@ -276,7 +282,8 @@ def _poll_once():
         name = " ".join(str(a.get("global_name") or a.get("username") or "손님").split())[:20]
         text = _text(m)
         if text:
-            _arrive(("w:" + name) if m.get("webhook_id") else a.get("id", name), name, text)
+            _arrive(("w:" + name) if m.get("webhook_id") else a.get("id", name), name, text,
+                    human=not m.get("webhook_id") and not a.get("bot"))
             _STATE["recv_at"] = time.time()
     _STATE["error"] = ""
 

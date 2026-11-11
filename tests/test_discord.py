@@ -96,6 +96,43 @@ class DiscordTest(unittest.TestCase):
         os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = "https://evil.example.com/api/webhooks/1/x"
         self.assertFalse(dc.send_on())
 
+    def test_name_call_and_roam(self):
+        from boa3d import lib3d_agents as ag
+        a, q = ag.match_name("한서윤 씨 책 추천해 줘")
+        self.assertEqual((a["id"], q), ("librarian", "책 추천해 줘"))
+        self.assertEqual(ag.match_name("서윤아 어디야")[0]["id"], "librarian")
+        self.assertEqual(ag.match_name("사서님 만화 찾아줘")[0]["id"], "librarian")
+        self.assertEqual(ag.match_name("오늘 사서 봤어?"), (None, None))     # 직업은 글 맨 앞에서 부를 때만
+        self.assertEqual(ag.match_name("@사서 추천"), (None, None))          # @는 귓속말 문답(match_call)
+        self.assertEqual(ag.match_name("안녕", speaker="[출판사] 한서윤"), (None, None))
+        called = []
+        for obj, attr, fake in ((ag, "talk", lambda a, key, q, floor, admin, adult, display=None, public=False: called.append((a["id"], key, public))),
+                                (ag.lib3d_ai, "flags", lambda: {"ask": True}), (ag.lib3d_ai, "configured", lambda: True),
+                                (ag.lib3d_ai, "budget", lambda: {"limit": 0, "used": 0})):
+            self.addCleanup(setattr, obj, attr, getattr(obj, attr))
+            setattr(obj, attr, fake)
+        ag.state()["agents"].pop("docent", None)
+        dc._arrive("9", "애순이", "이도윤 씨 안내 좀", human=True)
+        dc._arrive("b", "봇", "이도윤 씨 안내 좀", human=False)             # 봇 글에는 답하지 않는다
+        dc._arrive("9", "애순이", "이도윤 씨 또 왔어요", human=True)         # 바로 다시 부르면 쉰다
+        self.assertEqual(called, [("docent", "discord:9", True)])
+        # 혼자 돌아다니기: 브런치 담당만 제자리, 나머지는 서재 안 다른 곳으로
+        self.assertFalse(ag.roams({"id": "x", "job": "브런치 연재 관리"}))
+        self.assertTrue(ag.roams({"id": "x", "job": "브런치 연재 관리", "roam": True}))
+        import random
+        places, ag._floor_places = ag._floor_places, lambda floor: list(ag.PLACES) + ["만화"]   # 시험에서는 DB를 읽지 않게
+        self.addCleanup(setattr, ag, "_floor_places", places)
+        for s0 in ag.state()["agents"].values():
+            s0.pop("roam_next", None)
+            s0["t"] = 0
+        moved = ag.roam_tick(5000.0, random.Random(3))
+        self.assertEqual(set(moved), {x["id"] for x in ag.staff()})
+        self.assertTrue(all(ag.state()["agents"][i]["target"] for i in moved))
+        self.assertEqual(ag.roam_tick(5005.0), [])                          # 머무는 동안은 그대로
+        ag._WORKING.add("librarian")
+        self.assertNotIn("librarian", ag.roam_tick(9000.0, random.Random(4)))   # 업무 중이면 안 움직인다
+        ag._WORKING.discard("librarian")
+
     def test_thread_id_in_webhook_url(self):
         for tail in ("?thread_id=555", "&thread_id=555", "?wait=true&thread_id=555"):
             os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = HOOK + tail

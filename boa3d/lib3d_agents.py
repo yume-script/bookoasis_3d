@@ -58,6 +58,8 @@ GUEST_SHOW_SEC = 1800      # 방문이 이보다 길어지면 화면에서 뺀�
 GUEST_LEAVE_SEC = 40       # 나가는 걸음 (입구까지 걸어간 뒤 사라짐)
 STAFF_RETURN_SEC = 150     # 직원이 마지막 행동 뒤 그 자리에 머무는 시간
 GUEST_WALK_SEC = 12        # 손님이 이동·책 살펴보기 뒤에 머무는 시간
+ROAM_SEC = (35, 110)       # 혼자 돌아다니기: 한 곳에 머무는 시간 (초, 최소·최대)
+NAME_CALL_GAP = 20         # 이름을 불러 답한 뒤 같은 직원이 다시 답하기까지 (초) - 채팅이 몰려도 AI 호출이 쌓이지 않게
 
 _VISIT_PROMPT = ("도서관에 놀러 온 시간이다. 네 관심사에 맞는 책을 찾고 싶다. 순서: "
                  "1) move_to로 관심 있어 보이는 구역으로 간다. "
@@ -115,6 +117,7 @@ _LOCK = threading.RLock()
 _CFG = {"v": None}
 _STATE = {"v": None}
 _BUSY = set()
+_WORKING = set()   # 지금 업무 중인 직원 id (돌아다니기를 멈춘다)
 
 
 # ── 저장 ──
@@ -204,6 +207,14 @@ def agent(aid):
     return next((a for a in config_get()["agents"] if a["id"] == aid), None)
 
 
+def roams(a):
+    """혼자 돌아다니는 직원인가: 설정(roam)이 있으면 그대로, 없으면 브런치 연재 담당만 제자리"""
+    if "roam" in (a or {}):
+        return bool(a["roam"])
+    blob = " ".join(str((a or {}).get(k) or "") for k in ("id", "name", "job", "goal")).lower()
+    return "브런치" not in blob and "brunch" not in blob
+
+
 def save_config(body):
     """설정 화면: {autonomous, agents:[{id, name, job, goal, personality, call, enabled, tasks:[{id,title,every_min,enabled,prompt}]}]}"""
     cfg = copy.deepcopy(config_get())
@@ -225,6 +236,8 @@ def save_config(body):
                 a[k] = str(upd[k] or "").strip()[:600] or a[k]
         if "enabled" in upd:
             a["enabled"] = bool(upd["enabled"])
+        if "roam" in upd and not is_guest(a):
+            a["roam"] = bool(upd["roam"])
         if "remote_url" in upd and not is_guest(a):   # 바깥 AI(디스코드 봇 등)가 이 직원 대신 생각한다 - 빈칸이면 이 서버의 AI
             url = str(upd["remote_url"] or "").strip()
             if url and not re.match(r"^https?://[^\s]+$", url):
@@ -625,8 +638,69 @@ def match_call(text):
     return None, None
 
 
-def talk(a, username, question, floor, admin, adult, display=None):
-    """이용자가 부름: 질문·답은 부른 사람에게만(채팅 귓속말), 직원의 say는 그 층 모두에게"""
+_HONORIFIC = r"(?:\s?(?:님|씨|선생님|아|야|이))?"
+
+
+def match_name(text, skip_remote=False, speaker=""):
+    """채팅에서 직원 이름을 부름 ('한서윤 씨 추천해 줘', '사서님 어디 있어요', '서윤아') → (에이전트, 할 말) 또는 (None, None).
+    이름(성 뺀 이름도)은 글 어디에 있어도, 부르는 말(@ 뺀 것)·직업은 글 맨 앞에 있을 때만."""
+    text = " ".join(str(text or "").split())
+    if not text or text.startswith("@"):
+        return None, None
+    best = None
+    for a in staff():
+        if (skip_remote and is_remote(a)) or (speaker and a.get("name") and a["name"] in speaker):
+            continue
+        name = str(a.get("name") or "").strip()
+        names = [name] + ([name[1:]] if re.fullmatch(r"[가-힣]{3}", name) else [])
+        for n in names:
+            if len(n) < 2:
+                continue
+            if n == name:   # 성까지 붙인 이름은 글 어디에 있어도
+                m = re.search(re.escape(n) + _HONORIFIC, text)
+            else:           # 성 뺀 이름은 다른 낱말의 일부가 아닐 때만
+                m = re.search(r"(?<![가-힣A-Za-z])" + re.escape(n) + _HONORIFIC + r"(?=[\s,!?.~]|$)", text)
+            if m and (best is None or len(n) > best[2]):
+                best = (a, m, len(n))
+        heads = [c.lstrip("@") for c in a.get("call", [])] + [_short(a.get("job"))]
+        for h in heads:
+            if len(h) < 2:
+                continue
+            m = re.match(re.escape(h) + _HONORIFIC + r"(?=[\s,!?.~]|$)", text)
+            if m and (best is None or len(h) > best[2]):
+                best = (a, m, len(h))
+    if not best:
+        return None, None
+    a, m, _n = best
+    rest = (text[:m.start()] + " " + text[m.end():]).strip(" ,!?.~") if m.start() == 0 else text
+    return a, rest or "(이름을 불렀다 - 인사하고 무엇을 도울지 묻는다)"
+
+
+def name_call(text, key, display, floor, admin=False, adult=False, skip_remote=False):
+    """채팅(또는 디스코드)에서 이름이 불린 직원이 모두가 보는 채팅으로 답한다. 조건이 안 맞으면 조용히 넘어간다. 답하면 True"""
+    a, question = match_name(text, skip_remote, display or "")
+    if not a or not lib3d_ai.flags().get("ask"):
+        return False
+    if not is_remote(a):
+        b = lib3d_ai.budget()
+        if not lib3d_ai.configured() or (b["limit"] and b["used"] >= b["limit"]):
+            return False
+    now = time.time()
+    with _LOCK:
+        s = state()["agents"].setdefault(a["id"], {})
+        if now - s.get("name_t", 0) < NAME_CALL_GAP:
+            return False
+        s["name_t"] = now
+    try:
+        talk(a, key, question, floor or _ground_floor(), admin, adult, display=display, public=True)
+    except ValueError:
+        return False
+    return True
+
+
+def talk(a, username, question, floor, admin, adult, display=None, public=False):
+    """이용자가 부름: 질문·답은 부른 사람에게만(채팅 귓속말), 직원의 say는 그 층 모두에게.
+    public(채팅에서 이름을 부름)이면 질문은 이미 채팅에 있고, 답도 그 층 모두에게 채팅·말풍선으로."""
     if not is_remote(a) and not lib3d_ai.configured():
         raise ValueError("AI 설정(연결 방식·주소·모델)을 먼저 해 주세요 - 3D 서재 설정 > AI 설정.")
     if not question:
@@ -637,8 +711,16 @@ def talk(a, username, question, floor, admin, adult, display=None):
             raise ValueError("%s이(가) 앞 이야기에 답하는 중입니다. 잠시만요." % a["name"])
         _BUSY.add(key)
     who = "%s (%s)" % (a["name"], _short(a["job"]))
-    lib3d_presence.post(display or username, a["call"][0] + " " + question, floor, to=username)
-    lib3d_presence.post(who, "…", floor, to=username)
+    to = None if public else username
+    if not public:
+        lib3d_presence.post(display or username, a["call"][0] + " " + question, floor, to=username)
+        lib3d_presence.post(who, "…", floor, to=username)
+    else:
+        question = "[채팅에서 네 이름을 불렀다. 모두가 듣는 자리이니 한두 문장으로 짧게 답한다] " + question
+
+    def bubble(text):   # 모두에게 보이는 답은 말풍선으로도
+        if public and text:
+            WorldTools(a["id"], floor)._set(say=" ".join(text.split())[:160], say_t=time.time())
 
     def run():
         found = []
@@ -652,7 +734,8 @@ def talk(a, username, question, floor, admin, adult, display=None):
                         remote_act(a["id"], str(res.get("say") or "")[:160], str(res.get("place") or ""), floor)
                     except ValueError:
                         pass
-                lib3d_presence.post(who, answer, floor, to=username)
+                lib3d_presence.post(who, answer, floor, to=to)
+                bubble(answer)
                 return
             hist = state()["users"].get(username, {}).get("hist", {}).get(a["id"], [])
             out = lib3d_ai.ask(question, hist, system=_system(a, floor, display or username, not admin),
@@ -669,11 +752,15 @@ def talk(a, username, question, floor, admin, adult, display=None):
             if acts:
                 add_log(a["id"], "%s님 응대" % (display or username), question[:60] + " → " + answer[:160], books, private=True)
         except Exception as error:  # noqa: BLE001
+            if public:   # 모두가 보는 채팅에는 오류를 올리지 않는다
+                log.warning("AI 직원 %s 이름 응답 실패: %s", a["id"], error)
+                return
             answer = "죄송해요, 지금은 답하지 못했어요: %s" % error
         finally:
             with _LOCK:
                 _BUSY.discard(key)
-        lib3d_presence.post(who, answer, floor, to=username, books=books)
+        lib3d_presence.post(who, answer, floor, to=to, books=books)
+        bubble(answer)
     threading.Thread(target=run, daemon=True).start()
 
 
@@ -684,6 +771,16 @@ def run_task(a, task):
     floor = "general" if "general" in floors or not floors else floors[0]
     found = []
     world = WorldTools(a["id"], floor, found, pace=is_guest(a))
+    with _LOCK:
+        _WORKING.add(a["id"])
+    try:
+        return _run_task(a, task, floor, found, world)
+    finally:
+        with _LOCK:
+            _WORKING.discard(a["id"])
+
+
+def _run_task(a, task, floor, found, world):
     if is_guest(a):   # 손님: 입구로 들어와서 → 둘러보고 → 입구로 나간다
         with _LOCK:
             st = state()["agents"].setdefault(a["id"], {})
@@ -781,6 +878,46 @@ def _loop():
         time.sleep(30)
 
 
+def roam_tick(now=None, rng=random):
+    """혼자 돌아다니기: 일·응대 중이 아닌 직원이 서재 안 다른 곳으로 걸어간다 (AI 호출 없음). 움직인 직원 id 목록"""
+    now = now or time.time()
+    floor = _ground_floor()
+    places = [p for p in _floor_places(floor) if p not in ROOM_POSTS and p != "entrance"]
+    moved = []
+    with _LOCK:
+        busy = {k[0] for k in _BUSY} | set(_WORKING)
+        for a in staff():
+            if not roams(a) or a["id"] in busy:
+                continue
+            s = state()["agents"].setdefault(a["id"], {})
+            if now < s.get("roam_next", 0):
+                continue
+            if s.get("t", 0) != s.get("roam_t") and now - s.get("t", 0) < 60:   # 방금 일하거나 말한 자리에 잠깐 머문다
+                continue
+            post = a.get("post") or "lobby"
+            pool = [p for p in places if p != s.get("target")]
+            if post in ROOM_POSTS:   # 길 건너 일터가 있는 사람: 반은 일터, 반은 서재 나들이
+                place = post if (s.get("target") != post and rng.random() < 0.5) or not pool else rng.choice(pool)
+            else:
+                place = rng.choice(pool) if pool else post
+            s.update(target=place, book="", floor=floor, t=now, roam_t=now, roam_next=now + rng.uniform(*ROAM_SEC))
+            moved.append(a["id"])
+        if moved:
+            _save_state()
+    return moved
+
+
+def _roam_loop():
+    time.sleep(15)
+    while True:
+        try:
+            if lib3d_presence.active_count() > 0:   # 보는 사람이 있을 때만
+                roam_tick()
+        except Exception:  # noqa: BLE001
+            log.exception("AI 직원 돌아다니기")
+        time.sleep(8)
+
+
 _STARTED = {"v": False}
 _IDLE = {"v": False}
 
@@ -790,6 +927,7 @@ def start():
         return
     _STARTED["v"] = True
     threading.Thread(target=_loop, name="lib3d-agents", daemon=True).start()
+    threading.Thread(target=_roam_loop, name="lib3d-agents-roam", daemon=True).start()
 
 
 # ── 화면에 보낼 것 ──
@@ -842,6 +980,7 @@ def admin_info():
     cfg = copy.deepcopy(config_get())
     for a in cfg["agents"]:   # 토큰은 화면에 돌려주지 않는다
         a["remote_token_set"] = bool(a.pop("remote_token", None))
+        a["roam"] = roams(a)
     st = state()
     return {"config": cfg, "last_run": st["last_run"], "present": lib3d_presence.active_count(), "log": st["log"][-40:][::-1], "budget": lib3d_ai.budget(),
             "notes": {k: v.get("notes", []) for k, v in st["agents"].items()}, "configured": lib3d_ai.configured(),
