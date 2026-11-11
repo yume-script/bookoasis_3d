@@ -327,7 +327,7 @@
   }, [1, 1]);
   facadeTex.wrapS = facadeTex.wrapT = T.RepeatWrapping;
   Object.assign(M, {
-    pano: new T.MeshBasicMaterial({ side: T.BackSide, fog: false }),   // 그림은 applyOutside()가 상태별로
+    pano: new T.MeshBasicMaterial({ side: T.BackSide, fog: false, depthWrite: false }),   // 깊이를 쓰지 않아 원통 너머의 큰 산·숲이 그 위에 그려진다   // 그림은 applyOutside()가 상태별로
     lightPool: new T.MeshBasicMaterial({ map: canvasTex(64, 64, function (g) { var gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,150,0.55)'); gr.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }), transparent: true, depthWrite: false, opacity: 0 }),
     streetLight: new T.MeshStandardMaterial({ color: 0xfff6e0, emissive: 0x000000, emissiveIntensity: 1.6, roughness: 0.4 }),
     pole: new T.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.5, metalness: 0.6 }),
@@ -530,6 +530,7 @@
     tint(EXT.stone, 0xe6e0d4); tint(EXT.metal, 0x2a2e34); tint(EXT.glass, 0x23374a); tint(EXT.soffit, 0xb98a5a); tint(EXT.spine, 0xffffff);
     [EXT.stone, EXT.metal, EXT.glass, EXT.soffit, EXT.spine].forEach(function (m) { m.envMapIntensity = m === EXT.glass ? envOut * 2.4 : envOut; m.userData.envSet = true; });
     extNight(night, dusk);
+    campTint(o, f, envOut);
   }
   setInterval(function () { applyOutside(); }, 60000);   // 자동(시간·계절·날씨)이면 1분마다 확인
 
@@ -837,10 +838,10 @@
                      ['#3a0ca3', '#ffffff'], ['#222222', '#ffd166'], ['#e76f51', '#ffffff']];
   function addOutside(w, back, front, floorIdx) {
     var gy = -floorIdx * 4.5 - 0.05, cz = (front + back) / 2, d = front - back, r = rnd(53 + floorIdx);
-    var ground = new T.Mesh(new T.CircleGeometry(SCENE_R - 2, 48), M.grass); ground.rotation.x = -Math.PI / 2; add(ground, 0, gy, cz);
+    var rz0 = front + PLAZA_D + RIVER_GAP, rz1 = rz0 + RIVER_W;   // 서재 앞 강 (땅은 addRiverCamp가 강 양쪽으로 깐다)
     var pano = new T.Mesh(new T.CylinderGeometry(SCENE_R, SCENE_R, 110, 64, 1, true), M.pano);
     add(pano, 0, EYE - 110 * 0.3 + 110 / 2, cz);   // 그림의 지평선(아래에서 30%)을 눈높이에 맞춘다
-    pano.rotation.y = floorIdx * 1.3;
+    pano.rotation.y = floorIdx * 1.3; pano.renderOrder = -10;
     var len = d + 120;
     var signed = { gallery: false, jazz: false, office: false, next: 0 };
     BANNER_B = null; bannerMesh = null; SHOPS = {};
@@ -850,6 +851,7 @@
       var road = new T.Mesh(new T.PlaneGeometry(8, len), M.road); road.rotation.x = -Math.PI / 2; add(road, roadX, gy + 0.01, cz);
       var walk2 = new T.Mesh(new T.PlaneGeometry(5, len), M.pave); walk2.rotation.x = -Math.PI / 2; add(walk2, farWalkX, gy + 0.02, cz);
       for (var tz = back - 40; tz < front + 40; tz += 7 + r() * 3) {   // 가로수 (양쪽 보도)
+        if (tz > rz0 - 2.5 && tz < rz1 + 2.5) continue;   // 다리 위에는 심지 않는다
         [walkX + side * 1.4, farWalkX - side * 1.4].forEach(function (tx) {
           var trunk = new T.Mesh(trunkGeo, M.trunk); add(trunk, tx, gy + 1.3, tz);
           var ch = gy + 3.4 + r() * 0.5;
@@ -870,6 +872,7 @@
       for (var bz = back - 50; bz < front + 50;) {   // 건너편 건물들
         var bw = 10 + r() * 14, bd = 10 + r() * 10, bh = 9 + Math.pow(r(), 1.6) * 34;
         var mat = M.facade[Math.floor(r() * M.facade.length)];
+        if (bz + bw > rz0 - 1) break;   // 건물은 강가까지만 (강 건너는 숲과 캠핑장)
         var bld = new T.Mesh(unitBox, mat); bld.scale.set(bd, bh, bw);
         var bx = side * (w / 2 + 18 + bd / 2 + r() * 6);
         add(bld, bx, gy + bh / 2, bz + bw / 2);
@@ -899,9 +902,249 @@
         bz += bw + 2 + r() * 6;
       }
     });
+    addRiverCamp(w, back, front, gy, floorIdx);
     addWeather(w, back, front, gy);
     addCars(w, back, front, gy);
     setTimeout(placeBanner, 0);   // 층을 다 지은 뒤
+  }
+  // ── 서재 앞 큰 강 + 강 건너 캠핑장 (눈 덮인 산 아래, 밤이면 텐트마다 불이 켜진다) ──
+  // 앞마당 끝에서 나무다리(가운데)나 양옆 보도 다리로 강을 건너면 캠핑장. 걸어서 둘러보고 빈 의자에 앉을 수 있다.
+  var RIVER_GAP = 2.5, RIVER_W = 28, CAMP_D = 44;
+  var RV = null, campFx = null;   // RV: 지금 1층의 강·캠핑장 자리 (걸을 수 있는 곳 계산용)
+  var waterTex = canvasTex(256, 256, function (g, w, h) {
+    var r = rnd(71); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 420; i++) {
+      g.strokeStyle = 'rgba(' + (r() < 0.5 ? '255,255,255,' : '20,50,80,') + (0.05 + r() * 0.12) + ')'; g.lineWidth = 1 + r() * 1.5;
+      var x = r() * w, y = r() * h, l = 10 + r() * 34; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l / 2, y + (r() - 0.5) * 5, x + l, y); g.stroke();
+    }
+  }, [26, 5]);
+  var fujiTex = canvasTex(1024, 512, function (g, w, h) {   // 꼭대기가 평평하고 눈이 덮인 큰 산
+    function shape() {
+      g.beginPath(); g.moveTo(0, h); g.bezierCurveTo(w * 0.22, h * 0.9, w * 0.36, h * 0.42, w * 0.445, h * 0.1);
+      g.lineTo(w * 0.47, h * 0.085); g.lineTo(w * 0.5, h * 0.1); g.lineTo(w * 0.53, h * 0.08); g.lineTo(w * 0.555, h * 0.1);
+      g.bezierCurveTo(w * 0.64, h * 0.42, w * 0.78, h * 0.9, w, h); g.closePath();
+    }
+    g.clearRect(0, 0, w, h);
+    var gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#7f8db0'); gr.addColorStop(0.6, '#93a2c0'); gr.addColorStop(1, '#b4c0d4');
+    shape(); g.fillStyle = gr; g.fill();
+    g.save(); shape(); g.clip();
+    var r = rnd(73); g.fillStyle = '#f6f8fc';
+    g.beginPath(); g.moveTo(w * 0.3, 0); g.lineTo(w * 0.7, 0);
+    for (var x = w * 0.7; x >= w * 0.3; x -= w * 0.02) g.lineTo(x, h * (0.3 + r() * 0.2 - Math.abs(x - w * 0.5) / w * 0.25));
+    g.closePath(); g.fill();
+    for (var i = 0; i < 26; i++) {   // 골짜기를 따라 흘러내린 눈
+      var sx = w * (0.4 + r() * 0.2), len = h * (0.18 + r() * 0.3), dx = (sx - w * 0.5) * (0.6 + r());
+      g.strokeStyle = 'rgba(246,248,252,' + (0.35 + r() * 0.45) + ')'; g.lineWidth = 3 + r() * 9;
+      g.beginPath(); g.moveTo(sx, h * 0.3); g.lineTo(sx + dx, h * 0.3 + len); g.stroke();
+    }
+    g.restore();
+  });
+  var flareTex = canvasTex(128, 128, function (g, w, h) {   // 랜턴 불빛 (가운데 빛 + 가는 빛줄기)
+    g.clearRect(0, 0, w, h);
+    var gr = g.createRadialGradient(64, 64, 1, 64, 64, 62); gr.addColorStop(0, 'rgba(255,236,190,1)'); gr.addColorStop(0.18, 'rgba(255,190,90,0.55)'); gr.addColorStop(1, 'rgba(255,170,60,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.translate(64, 64);
+    for (var i = 0; i < 6; i++) { g.rotate(Math.PI / 6); var lg = g.createLinearGradient(-62, 0, 62, 0); lg.addColorStop(0, 'rgba(255,220,160,0)'); lg.addColorStop(0.5, 'rgba(255,235,190,0.8)'); lg.addColorStop(1, 'rgba(255,220,160,0)'); g.fillStyle = lg; g.fillRect(-62, -0.8, 124, 1.6); }
+  });
+  var TENT_COLORS = [0xd9772e, 0xc8651f, 0x8a6a45, 0xa8552a, 0x6f7f4a, 0xe3c9a0, 0xb9482e, 0x9a7b55];
+  var CAMP = {
+    water: new T.MeshStandardMaterial({ map: waterTex, color: 0x4f86a8, roughness: 0.12, metalness: 0.55 }),
+    bank: new T.MeshStandardMaterial({ color: 0x8e8a80, roughness: 0.95 }),
+    wood: new T.MeshStandardMaterial({ color: 0x8a6645, roughness: 0.85 }),
+    dirt: new T.MeshStandardMaterial({ color: 0xb09a78, roughness: 1 }),
+    tent: TENT_COLORS.map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.85, side: T.DoubleSide, emissive: 0x000000, flatShading: true }); }),
+    canopy: new T.MeshStandardMaterial({ color: 0x3f7a55, roughness: 0.85, side: T.DoubleSide }),
+    lamp: new T.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0x000000, emissiveIntensity: 2.2, roughness: 0.4 }),
+    flame: new T.MeshBasicMaterial({ color: 0xffa23a, transparent: true, opacity: 0.9, fog: false }),
+    stone: new T.MeshStandardMaterial({ color: 0x6f6b66, roughness: 1, flatShading: true }),
+    pine: [0x2f5a3c, 0x3a6a45, 0x274d35].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }); }),
+    hammock: new T.MeshStandardMaterial({ color: 0x3b6fb0, roughness: 0.9, side: T.DoubleSide }),
+    chair: new T.MeshStandardMaterial({ color: 0x4a5a48, roughness: 0.9 }),
+    cooler: new T.MeshStandardMaterial({ color: 0xd9e4ea, roughness: 0.6 }),
+    fuji: new T.MeshBasicMaterial({ map: fujiTex, alphaTest: 0.5, fog: false, side: T.DoubleSide }),
+    flare: new T.SpriteMaterial({ map: flareTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })
+  };
+  Object.keys(CAMP).forEach(function (k) { [].concat(CAMP[k]).forEach(function (m) { m.userData.keep = true; m.userData.envSet = true; }); });
+  var domeGeo = new T.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), tipiGeo = new T.ConeGeometry(1, 1, 6, 1, true), pineGeo = new T.ConeGeometry(1, 1, 7),
+      rockGeo = new T.IcosahedronGeometry(1, 0), bulbGeo = new T.SphereGeometry(1, 8, 6), flameGeo = new T.ConeGeometry(0.22, 0.7, 6);
+  [domeGeo, tipiGeo, pineGeo, rockGeo, bulbGeo, flameGeo].forEach(function (gq) { gq.userData.shared = true; });
+  function campTint(o, f, envOut) {   // applyOutside에서: 시간·계절·날씨에 맞춰 강·캠핑장 색과 불빛
+    var night = o.time === 'night', dusk = o.time === 'dusk', grey = o.weather !== 'clear', winter = o.season === 'winter', lit = night || dusk || grey;
+    function tint(m, hex) { m.color.setHex(hex).multiplyScalar(f); }
+    tint(CAMP.water, night ? 0x6f8fd0 : dusk ? 0xc98f7a : grey ? 0x6f8794 : 0x4f86a8); CAMP.water.envMapIntensity = Math.max(0.15, envOut * 3);
+    tint(CAMP.bank, winter ? 0xdfe3e6 : 0x8e8a80); tint(CAMP.wood, 0x8a6645); tint(CAMP.dirt, winter ? 0xe6e6e2 : 0xb09a78);
+    CAMP.tent.forEach(function (m, i) {   // 밤에는 안에 켠 랜턴으로 천이 주황빛으로 비친다
+      tint(m, TENT_COLORS[i]);
+      m.emissive.setHex(night ? 0xff8a2a : dusk ? 0x7a3a10 : 0x000000); m.emissiveIntensity = night ? (i % 3 === 2 ? 0.25 : 0.75) : 0.35;
+    });
+    tint(CAMP.canopy, 0x3f7a55); tint(CAMP.stone, 0x6f6b66); tint(CAMP.hammock, 0x3b6fb0); tint(CAMP.chair, 0x4a5a48); tint(CAMP.cooler, 0xd9e4ea);
+    CAMP.pine.forEach(function (m, i) { tint(m, winter ? [0x9fb0a4, 0xaebcb2, 0x8fa398][i] : [0x2f5a3c, 0x3a6a45, 0x274d35][i]); });
+    CAMP.lamp.emissive.setHex(lit ? 0xffc46a : 0x000000);
+    CAMP.flare.opacity = night ? 0.7 : dusk ? 0.35 : 0;
+    CAMP.fuji.color.setHex(night ? 0x4d4f86 : dusk ? 0xf2b9a0 : grey ? 0xc3c8cf : 0xffffff);
+    [CAMP.bank, CAMP.wood, CAMP.dirt, CAMP.canopy, CAMP.stone, CAMP.hammock, CAMP.chair, CAMP.cooler].concat(CAMP.tent, CAMP.pine).forEach(function (m) { m.envMapIntensity = envOut; });
+    if (campFx) campFx.night = night ? 1 : dusk ? 0.6 : grey ? 0.4 : 0.25;
+  }
+  function addRiverCamp(w, back, front, gy, floorIdx) {
+    var cz = (front + back) / 2, z0 = front + PLAZA_D + RIVER_GAP, z1 = z0 + RIVER_W, W = SCENE_R * 2;
+    var farZ = cz + SCENE_R - 4, campZ1 = Math.min(z1 + CAMP_D, farZ - 18), hw = w / 2 + 4.6, r = rnd(907);
+    var walk = floorIdx === 0 && cur === 0;
+    RV = walk ? { z0: z0, z1: z1, cz1: campZ1, hw: hw, blocks: [], seats: [], fire: null } : null;
+    campFx = { night: 0.25, flames: [], light: null, t: 0 };
+    function plane(wd, dp, mat, x, y, z) { var m = new T.Mesh(new T.PlaneGeometry(wd, dp), mat); m.rotation.x = -Math.PI / 2; return add(m, x, y, z); }
+    function ubox(sx, sy, sz, mat, x, y, z) { var m = new T.Mesh(unitBox, mat); m.scale.set(sx, sy, sz); return add(m, x, y, z); }
+    // 땅(강 이쪽·저쪽) + 강물(땅보다 낮게) + 돌 둑
+    var nearD = z0 - (cz - SCENE_R), farD = cz + SCENE_R - z1;
+    plane(W, nearD, M.grass, 0, gy, z0 - nearD / 2); plane(W, farD, M.grass, 0, gy, z1 + farD / 2);
+    plane(W, RIVER_W, CAMP.water, 0, gy - 0.85, (z0 + z1) / 2);
+    ubox(W, 1.0, 0.5, CAMP.bank, 0, gy - 0.5, z0 + 0.25); ubox(W, 1.0, 0.5, CAMP.bank, 0, gy - 0.5, z1 - 0.25);
+    for (var i = 0; i < 26; i++) { var rk = new T.Mesh(rockGeo, CAMP.stone), rs = 0.3 + r() * 0.7; rk.scale.set(rs * 1.4, rs * 0.7, rs); rk.rotation.y = r() * 6;   // 물가 바위
+      add(rk, (r() - 0.5) * W * 0.8, gy - 0.75, r() < 0.5 ? z0 + 1 + r() * 1.5 : z1 - 1 - r() * 1.5); }
+    // 양옆 길(보도·차도)이 강을 건너는 다리: 상판 + 교각 + 난간
+    [1, -1].forEach(function (side) {
+      var mx = side * (w / 2 + 9);
+      ubox(18.4, 0.5, RIVER_W + 1, M.parapet, mx, gy - 0.26, (z0 + z1) / 2);
+      for (var pz = z0 + 5; pz < z1 - 2; pz += 9) ubox(16, 0.9, 1.0, M.parapet, mx, gy - 0.7, pz);
+      [side * (w / 2 - 0.05), side * (w / 2 + 18.05)].forEach(function (rx) {
+        ubox(0.08, 0.06, RIVER_W + 1, M.pole, rx, gy + 1.05, (z0 + z1) / 2); ubox(0.05, 0.05, RIVER_W + 1, M.pole, rx, gy + 0.55, (z0 + z1) / 2);
+        for (var qz = z0 - 0.4; qz <= z1 + 0.5; qz += 2) ubox(0.07, 1.05, 0.07, M.pole, rx, gy + 0.52, qz);
+      });
+    });
+    // 가운데 나무 보행교 (앞마당 → 캠핑장)
+    var bz0 = front + PLAZA_D + 0.3, bl = z1 + 0.6 - bz0, bcz = bz0 + bl / 2;
+    ubox(3.4, 0.16, bl, CAMP.wood, 0, gy - 0.02, bcz);
+    for (var pl = bz0 + 0.3; pl < bz0 + bl; pl += 0.6) ubox(3.4, 0.02, 0.5, CAMP.wood, 0, gy + 0.07, pl);   // 널빤지 결
+    for (var pz2 = z0 + 3.5; pz2 < z1 - 1; pz2 += 7) [-1.4, 1.4].forEach(function (px) { ubox(0.35, 1.1, 0.35, CAMP.wood, px, gy - 0.55, pz2); });
+    [-1.7, 1.7].forEach(function (rx) {
+      ubox(0.1, 0.08, bl, CAMP.wood, rx, gy + 1.05, bcz); ubox(0.06, 0.06, bl, CAMP.wood, rx, gy + 0.6, bcz);
+      for (var qz = bz0; qz <= bz0 + bl + 0.01; qz += 2.2) ubox(0.12, 1.1, 0.12, CAMP.wood, rx, gy + 0.55, qz);
+      [bz0 + 0.2, bz0 + bl - 0.2].forEach(function (lz) {   // 다리 양끝 등
+        ubox(0.1, 2.4, 0.1, M.pole, rx, gy + 1.2, lz); var b = new T.Mesh(bulbGeo, CAMP.lamp); b.scale.setScalar(0.1); add(b, rx, gy + 2.5, lz);
+        var fl = new T.Sprite(CAMP.flare); fl.scale.set(1.3, 1.3, 1); add(fl, rx, gy + 2.5, lz);
+      });
+    });
+    // 먼 산 (경치 그림 바로 앞의 큰 판) + 캠핑장 뒤 침엽수 숲
+    var fuji = new T.Mesh(new T.PlaneGeometry(250, 82), CAMP.fuji); fuji.rotation.y = Math.PI; add(fuji, 0, gy + 41 - 3, farZ);
+    function pine(x, z, s) {
+      ubox(0.3 * s, 1.2 * s, 0.3 * s, M.trunk, x, gy + 0.6 * s, z);
+      for (var k = 0; k < 3; k++) { var c = new T.Mesh(pineGeo, CAMP.pine[Math.floor(r() * 3)]); c.scale.set((1.5 - k * 0.38) * s, 1.9 * s, (1.5 - k * 0.38) * s); c.rotation.y = r() * 6; add(c, x, gy + (1.8 + k * 1.15) * s, z); }
+    }
+    for (var fx = -SCENE_R + 10; fx < SCENE_R - 10; fx += 3.2 + r() * 2.5) pine(fx, campZ1 + 3 + r() * 12, 1.3 + r() * 1.5);
+    [1, -1].forEach(function (side) {   // 강 건너 길 바깥쪽도 숲
+      for (var tz = z1 + 3; tz < campZ1 + 4; tz += 3.5 + r() * 2.5) for (var k = 0; k < 2; k++) pine(side * (w / 2 + 21 + k * 6 + r() * 5), tz + r() * 2, 1.2 + r() * 1.2);
+    });
+    // 캠핑장: 다리에서 이어지는 흙길, 텐트·타프·차·랜턴·모닥불·해먹
+    plane(3.6, campZ1 - z1 - 6, CAMP.dirt, 0, gy + 0.015, z1 + (campZ1 - z1 - 6) / 2);
+    plane(hw * 1.7, 3, CAMP.dirt, 0, gy + 0.014, z1 + 15);
+    function block(x, z, rad) { if (RV) RV.blocks.push({ x: x, z: z, r: rad }); }
+    function lantern(x, z, hgt) {
+      ubox(0.06, hgt, 0.06, M.pole, x, gy + hgt / 2, z);
+      var b = new T.Mesh(bulbGeo, CAMP.lamp); b.scale.setScalar(0.09); add(b, x, gy + hgt + 0.05, z);
+      var fl = new T.Sprite(CAMP.flare); fl.scale.set(2.2, 2.2, 1); add(fl, x, gy + hgt + 0.05, z);
+      var pool = new T.Mesh(poolGeo, M.lightPool); pool.rotation.x = -Math.PI / 2; add(pool, x, gy + 0.03, z);
+    }
+    function tent(kind, x, z, ry, mat) {
+      var g = new T.Group(); g.position.set(x, gy, z); g.rotation.y = ry; parent.add(g);
+      function gm(geo, m, sx, sy, sz, px, py, pz) { var q = new T.Mesh(geo, m); q.scale.set(sx, sy, sz); q.position.set(px || 0, py || 0, pz || 0); g.add(q); return q; }
+      if (kind === 0) {   // 돔 텐트 + 앞 전실
+        gm(domeGeo, mat, 2.0, 1.55, 1.8); gm(domeGeo, mat, 1.1, 1.0, 1.0, 0, 0, 1.5); block(x, z, 2.1);
+      } else if (kind === 1) {   // 원뿔(티피) 텐트
+        gm(tipiGeo, mat, 2.1, 3.3, 2.1, 0, 1.65, 0); gm(unitBox, M.pole, 0.05, 0.6, 0.05, 0, 3.4, 0); block(x, z, 1.9);
+      } else if (kind === 2) {   // 타프 쉘터 (맞배 지붕 천 + 기둥) - 아래로 지나다닐 수 있다
+        [-1, 1].forEach(function (s) { var p = gm(unitBox, mat, 2.9, 0.03, 4.6, s * 1.25, 2.05, 0); p.rotation.z = -s * 0.55; });
+        [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.06, 2.8, 0.06, 0, 1.4, pz); });
+        [-1, 1].forEach(function (s) { [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.05, 1.3, 0.05, s * 2.45, 0.65, pz); }); });
+      } else {   // 캐노피 (네 기둥 + 초록 지붕)
+        gm(tipiGeo, CAMP.canopy, 2.4, 0.9, 2.4, 0, 2.75, 0).rotation.y = Math.PI / 4;
+        [-1, 1].forEach(function (s) { [-1, 1].forEach(function (t) { gm(unitBox, M.pole, 0.06, 2.3, 0.06, s * 1.55, 1.15, t * 1.55); }); });
+      }
+      return g;
+    }
+    function chair(x, z, rot, free) {   // 캠핑 의자 (빈 의자는 앉을 수 있다)
+      var g = new T.Group(); g.position.set(x, gy, z); g.rotation.y = rot; parent.add(g);
+      var s = new T.Mesh(unitBox, CAMP.chair); s.scale.set(0.5, 0.05, 0.46); s.position.y = 0.42; g.add(s);
+      var b = new T.Mesh(unitBox, CAMP.chair); b.scale.set(0.5, 0.5, 0.05); b.position.set(0, 0.68, -0.24); b.rotation.x = -0.18; g.add(b);
+      [[-0.23, -0.2], [0.23, -0.2], [-0.23, 0.2], [0.23, 0.2]].forEach(function (q) { var l = new T.Mesh(unitBox, M.pole); l.scale.set(0.03, 0.42, 0.03); l.position.set(q[0], 0.21, q[1]); g.add(l); });
+      if (free && walk) addSeat(x, z, rot, 0.44); else if (RV) RV.seats.push({ x: x, z: z, rot: rot });
+    }
+    function table(x, z) {
+      ubox(1.2, 0.05, 0.7, CAMP.wood, x, gy + 0.62, z); [[-0.5, -0.28], [0.5, -0.28], [-0.5, 0.28], [0.5, 0.28]].forEach(function (q) { ubox(0.04, 0.62, 0.04, M.pole, x + q[0], gy + 0.31, z + q[1]); });
+      ubox(0.5, 0.36, 0.34, CAMP.cooler, x + 0.9, gy + 0.18, z + 0.1);
+      var b = new T.Mesh(bulbGeo, CAMP.lamp); b.scale.set(0.09, 0.12, 0.09); add(b, x - 0.3, gy + 0.75, z);
+      var fl = new T.Sprite(CAMP.flare); fl.scale.set(1.6, 1.6, 1); add(fl, x - 0.3, gy + 0.78, z);
+      block(x, z, 0.8);
+    }
+    // 모닥불 (가운데 길 옆 빈터) + 둘러앉는 의자
+    var fxp = 7.5, fzp = z1 + 9;
+    for (var st = 0; st < 9; st++) { var a0 = st / 9 * Math.PI * 2, sk = new T.Mesh(rockGeo, CAMP.stone); sk.scale.set(0.2, 0.14, 0.2); add(sk, fxp + Math.cos(a0) * 0.62, gy + 0.08, fzp + Math.sin(a0) * 0.62); }
+    [0.4, 1.5, 2.6].forEach(function (a1) { var lg = ubox(0.12, 0.12, 0.95, CAMP.wood, fxp, gy + 0.12, fzp); lg.rotation.y = a1; });
+    for (var fi = 0; fi < 4; fi++) { var fm = new T.Mesh(flameGeo, CAMP.flame); add(fm, fxp + (r() - 0.5) * 0.3, gy + 0.45, fzp + (r() - 0.5) * 0.3); campFx.flames.push({ m: fm, ph: r() * 6, y: gy + 0.45 }); }
+    var fglow = new T.Sprite(CAMP.flare); fglow.scale.set(3, 3, 1); add(fglow, fxp, gy + 0.7, fzp);
+    if (walk) { var fl0 = new T.PointLight(0xff9a3a, 0, 16, 2); add(fl0, fxp, gy + 1.0, fzp); campFx.light = fl0; }
+    block(fxp, fzp, 0.9); if (RV) RV.fire = { x: fxp, z: fzp };
+    for (var ci = 0; ci < 6; ci++) { var ca = ci / 6 * Math.PI * 2 + 0.3, cx1 = fxp + Math.sin(ca) * 2.1, cz1 = fzp + Math.cos(ca) * 2.1; chair(cx1, cz1, ca + Math.PI, ci % 2 === 1); }
+    // 텐트 자리: 가운데 길(|x|<3)과 모닥불 둘레를 피해 줄지어
+    var spots = [], rowsN = Math.max(2, Math.floor((campZ1 - z1 - 8) / 11));
+    for (var ry0 = 0; ry0 < rowsN; ry0++) for (var sx0 = -hw + 5; sx0 <= hw - 5; sx0 += 9.5) {
+      var tx = sx0 + (r() - 0.5) * 3, tz2 = z1 + 6 + ry0 * 11 + (r() - 0.5) * 3 + (ry0 === 0 ? 0 : 3);
+      if (Math.abs(tx) < 4.2 || Math.hypot(tx - fxp, tz2 - fzp) < 6.5 || Math.abs(tz2 - (z1 + 15)) < 3.2) continue;
+      spots.push([tx, tz2]);
+    }
+    spots.forEach(function (sp, si) {
+      var kind = si % 5 === 4 ? 3 : si % 3, mat = CAMP.tent[Math.floor(r() * CAMP.tent.length)], ry = Math.atan2(-sp[0], z1 + 15 - sp[1]) + (r() - 0.5) * 0.8;
+      tent(kind, sp[0], sp[1], ry, mat);
+      if (kind >= 2) { table(sp[0], sp[1]); chair(sp[0] - 1.2, sp[1] + 0.9, 1.2, true); chair(sp[0] + 0.3, sp[1] - 1.1, -0.3, false); }
+      if (r() < 0.75) lantern(sp[0] + Math.sin(ry) * 2.8 + 0.6, sp[1] + Math.cos(ry) * 2.8, 1.5 + r() * 0.6);
+      if (si % 4 === 1) {   // 텐트 옆에 세워 둔 차
+        var car = makeCar(r), cxp = sp[0] + (sp[0] > 0 ? 4.4 : -4.4);
+        if (Math.abs(cxp) < hw - 1.5) { car.position.set(cxp, gy, sp[1]); car.rotation.y = (r() - 0.5) * 0.8; parent.add(car); block(cxp, sp[1], 2.3); }
+      }
+    });
+    // 줄 전구 (기둥 사이에 늘어뜨린 작은 전구)
+    [[-hw + 3, z1 + 4.5, -6, z1 + 4.5], [5, z1 + 20.5, hw - 4, z1 + 20.5]].forEach(function (ln) {
+      ubox(0.07, 2.9, 0.07, M.pole, ln[0], gy + 1.45, ln[1]); ubox(0.07, 2.9, 0.07, M.pole, ln[2], gy + 1.45, ln[3]);
+      var n = Math.max(6, Math.floor(Math.abs(ln[2] - ln[0]) / 1.3));
+      for (var k = 1; k < n; k++) { var t = k / n, b = new T.Mesh(bulbGeo, CAMP.lamp); b.scale.setScalar(0.07); add(b, ln[0] + (ln[2] - ln[0]) * t, gy + 2.85 - Math.sin(t * Math.PI) * 0.55, ln[1]); }
+    });
+    // 해먹 (스탠드 둘 사이에 처진 천)
+    var hx = -8.5, hz = z1 + 9.5;
+    [-1.7, 1.7].forEach(function (o) { [-0.35, 0.35].forEach(function (s) { var lg2 = ubox(0.06, 1.5, 0.06, M.pole, hx + o + s * 0.4, gy + 0.7, hz); lg2.rotation.z = s * 0.9; }); });
+    for (var hk = 0; hk < 9; hk++) { var ht = (hk + 0.5) / 9, hs = ubox(0.4, 0.03, 0.85, CAMP.hammock, hx - 1.6 + ht * 3.2, gy + 1.25 - Math.sin(ht * Math.PI) * 0.6, hz); hs.rotation.z = -Math.cos(ht * Math.PI) * 0.55; }
+    block(hx, hz, 1.6); lantern(hx + 2.6, hz + 0.8, 1.8);
+  }
+  function campWalk(x, z) {   // 가운데 나무다리 + 캠핑장 풀밭 (텐트·차·모닥불은 돌아서)
+    if (!RV || !layout) return false;
+    if (Math.abs(x) < 1.45 && z >= layout.front + PLAZA_D - 0.5 && z <= RV.z1 + 1) return true;
+    if (Math.abs(x) <= RV.hw && z >= RV.z1 + 0.6 && z <= RV.cz1) {
+      for (var i = 0; i < RV.blocks.length; i++) { var b = RV.blocks[i]; if (Math.hypot(x - b.x, z - b.z) < b.r) return false; }
+      return true;
+    }
+    return false;
+  }
+  function spawnCampers(seed, place) {   // 캠핑하는 사람들: 모닥불가에 앉은 사람, 서서 이야기하는 사람, 산을 보는 사람
+    if (!RV) return;
+    var r = rnd(seed * 211 + 5), n = 0;
+    function mk() { return makePerson(seed * 223 + 41 + (n++) * 37); }
+    RV.seats.forEach(function (s, i) {   // 의자에 앉은 사람 (관절 모형은 의자 옆에 선다)
+      if (i > 5) return;
+      var p = mk();
+      if (p.mixer) { p.kind = 'staff'; place(p, s.x + Math.sin(s.rot) * 0.7, s.z + Math.cos(s.rot) * 0.7, s.rot); setLook(p, 'calm'); }
+      else { p.kind = 'sit'; place(p, s.x, s.z, s.rot); p.body.position.y = -0.5; p.legL.rotation.x = -1.5; p.legR.rotation.x = -1.5; }
+    });
+    var f = RV.fire;
+    [[-5.5, 13.5, 0.9], [-4.5, 14.2, -2.2], [4.5, 24, Math.PI], [-12, 5, Math.PI]].forEach(function (q, i) {   // 서 있는 사람: 둘은 마주 보고, 둘은 산·강을 본다
+      var p = mk(); p.kind = i < 2 ? 'chat' : 'staff'; place(p, q[0], RV.z1 + q[1], i === 2 ? 0 : q[2]); if (p.mixer) setLook(p, 'calm');
+    });
+    if (f) { var w0 = mk(); w0.kind = 'staff'; place(w0, f.x - 1.3, f.z + 2.6, Math.atan2(1.3, -2.6)); if (w0.mixer) setLook(w0, 'calm'); }   // 불 쬐며 선 사람
+  }
+  function updateCamp(dt, now) {   // 모닥불 일렁임 + 강물 흐름
+    if (!campFx) return;
+    waterTex.offset.x = (now / 9000) % 1; waterTex.offset.y = Math.sin(now / 5000) * 0.02;
+    for (var i = 0; i < campFx.flames.length; i++) {
+      var f = campFx.flames[i], s = 0.75 + Math.sin(now / 90 + f.ph) * 0.2 + Math.sin(now / 37 + f.ph * 2) * 0.1;
+      f.m.scale.set(0.8 + s * 0.3, s, 0.8 + s * 0.3); f.m.position.y = f.y + (s - 0.75) * 0.25;
+    }
+    if (campFx.light) campFx.light.intensity = campFx.night * (1.5 + Math.sin(now / 110) * 0.25 + Math.sin(now / 43) * 0.15);
   }
   // ── 1층 출입문 + 바깥 앞마당 (도서관 밖으로 나가 보기) ──
   var DOOR_W = 3.6, DOOR_H = 2.9, PLAZA_D = 9, autoDoor = null, CINE_WALL = null;
@@ -1407,7 +1650,8 @@
     var L = layout, ax = Math.abs(x), outer = L.w / 2 + 4.6;
     if (ax < DOOR_W / 2 - 0.35 && z > hall.z1 - 0.1 && z < L.front + 1.0) return autoDoor ? autoDoor.open > 0.55 : true;   // 문이 열려야 지나간다
     if (ax <= outer && z >= L.front + 0.45 && z <= L.front + PLAZA_D) return true;    // 앞마당
-    if (ax >= L.w / 2 + 0.45 && ax <= outer && z >= L.back - 38 && z <= L.front + 38) return true;   // 양옆 보도 (차도는 안 됨)
+    if (ax >= L.w / 2 + 0.45 && ax <= outer && z >= L.back - 38 && z <= (RV ? RV.z1 + 1 : L.front + 38)) return true;   // 양옆 보도 (차도는 안 됨) - 강 건너까지
+    if (campWalk(x, z)) return true;   // 나무다리 + 강 건너 캠핑장
     if (roomWalk(x, z)) return true;   // 횡단보도 건너 방들 (갤러리·재즈 청음실·사무실)
     return false;
   }
@@ -2548,6 +2792,7 @@
       staff.kind = 'staff'; place(staff, L.w / 2 - 5.5 - i * 1.1, L.front - 6.35, 0);
       if (staff.mixer) setLook(staff, 'calm');
     }
+    if (cur === 0) spawnCampers(seed, place);   // 강 건너 캠핑장 사람들
   }
 
   // 걷는 손님: 서점 안 아무 곳(통로 격자의 한 점)을 목적지로 골라 통로를 따라 꺾어 가며 간다.
@@ -3754,6 +3999,8 @@
     var fl = floors[cur] ? floors[cur].label + ' · ' : '';
     var room0 = roomAt(camera.position.x, camera.position.z);
     if (room0) { whereEl.textContent = room0.label; return; }
+    if (RV && cur === 0 && camera.position.z > RV.z1) { whereEl.textContent = '강 건너 캠핑장 · 빈 의자에 앉아 쉴 수 있어요'; return; }
+    if (RV && cur === 0 && camera.position.z > RV.z0) { whereEl.textContent = '강 위 다리 · 건너편은 캠핑장'; return; }
     if (isOutside(camera.position.x, camera.position.z)) { whereEl.textContent = '도서관 밖 · 유리문으로 들어오면 ' + fl.replace(/ · $/, ''); return; }
     whereEl.textContent = fl + (best && bd < 9 ? best.name + ' · ' + best.count + '작품' : '로비 · 엘리베이터나 [층]으로 다른 층');
   }
@@ -5180,7 +5427,7 @@
     var dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     step(dt);
-    if (!reading) { updatePeople(dt, now); updateWeather(dt, now); updateCars(dt); for (var rn in remotes) updateRemote(remotes[rn], dt);
+    if (!reading) { updatePeople(dt, now); updateWeather(dt, now); updateCars(dt); updateCamp(dt, now); for (var rn in remotes) updateRemote(remotes[rn], dt);
       for (var sn in staffNPC) updateStaff(staffNPC[sn], dt, now);
       if (narrator) updateStaff(narrator, dt, now);
       updateJazz(dt, now);
