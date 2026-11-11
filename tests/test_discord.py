@@ -96,6 +96,22 @@ class DiscordTest(unittest.TestCase):
         os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = "https://evil.example.com/api/webhooks/1/x"
         self.assertFalse(dc.send_on())
 
+    def test_thread_id_in_webhook_url(self):
+        for tail in ("?thread_id=555", "&thread_id=555", "?wait=true&thread_id=555"):
+            os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = HOOK + tail
+            self.assertEqual(dc.webhook(), ("111", HOOK))
+            self.assertEqual(dc.thread_id(), "555")
+        self.assertEqual(dc._resolve_channel(), "555")   # 받기도 그 스레드
+        pr.say("u4#c", "스레드로", "general", "누리")
+        dc._flush()
+        post = [c for c in self.calls if c[0] == "POST"][-1]
+        self.assertTrue(post[1].endswith("/webhooks/111/tok-en_1?wait=false&thread_id=555"))
+        os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = HOOK
+        self.assertEqual(dc.thread_id(), "")
+        os.environ["LIB3D_DISCORD_THREAD_ID"] = "777"
+        self.assertEqual(dc.thread_id(), "777")
+        os.environ.pop("LIB3D_DISCORD_THREAD_ID")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -397,8 +397,9 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 | `.env` | 하는 일 |
 |---|---|
 | `LIB3D_DISCORD_WEBHOOK_URL` | **보내기**: 채널 [설정 > 연동 > 웹후크 > 새 웹후크]의 주소. 3D 서재 채팅이 "이름 (3D 서재)"로 올라갑니다 |
+| `LIB3D_DISCORD_THREAD_ID` | 스레드(포럼 글)로 보낼 때만 스레드 ID. 웹후크 주소 뒤에 `?thread_id=...`로 붙여도 됩니다. 받기도 그 스레드를 읽습니다 |
 | `LIB3D_DISCORD_BOT_TOKEN` | **받기**: 디스코드 개발자 페이지(discord.com/developers)에서 앱 → Bot → 토큰. 같은 페이지에서 **Message Content Intent**를 켜고, OAuth2 URL로 서버에 초대(채널 보기·메시지 기록 보기 권한) |
-| `LIB3D_DISCORD_CHANNEL_ID` | 읽을 채널 (비우면 웹후크가 걸린 채널) |
+| `LIB3D_DISCORD_CHANNEL_ID` | 읽을 채널 (비우면 웹후크가 걸린 채널, 스레드로 보내면 그 스레드) |
 | `LIB3D_DISCORD_LABEL` | 디스코드에서 온 사람 이름표 (예: `출판사` → **[출판사] 애순이**) |
 | `LIB3D_DISCORD_SEND` | 보낼 것: `chat`(사람 채팅) `staff`(AI 직원·손님의 말) `delivery`(배달 도착), 기본 `chat,staff` |
 | `LIB3D_DISCORD_POLL_SEC` | 디스코드를 읽는 간격(초, 기본 3) |

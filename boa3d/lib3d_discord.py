@@ -4,7 +4,8 @@
   - 1층 등 일반 층의 함께 보기 채팅(chat), AI 직원·손님이 소리 내어 한 말(staff), 배달 도착(delivery) - LIB3D_DISCORD_SEND로 고름
   - 디스코드에는 "이름 (3D 서재)"로 보인다. 귓속말(@사서 문답)·성인 층은 보내지 않고, @everyone 같은 멘션은 막는다.
 받기 (디스코드 → 3D 서재): 봇 토큰 LIB3D_DISCORD_BOT_TOKEN으로 그 채널의 새 메시지를 LIB3D_DISCORD_POLL_SEC(3초)마다 읽는다
-  - 채널은 LIB3D_DISCORD_CHANNEL_ID, 비우면 웹후크가 걸린 채널
+  - 채널은 LIB3D_DISCORD_CHANNEL_ID, 비우면 웹후크가 걸린 채널 (스레드로 보내면 그 스레드)
+  - 스레드로 보내려면 웹후크 주소 뒤에 ?thread_id=스레드ID 를 붙이거나 LIB3D_DISCORD_THREAD_ID에 적는다
   - 말한 사람은 "[LIB3D_DISCORD_LABEL] 이름"(예: [출판사] 애순이)으로 1층 채팅에 바로 보이고, 1층 라운지에 손님으로 들어와 말풍선을 띄운다
     (말이 끊기고 STAY_SEC가 지나면 입구로 나간다)
   - 다른 봇·웹후크(예: 디스코드 봇의 인물들)가 쓴 글도 받는다. 이 서재가 웹후크로 보낸 글만 다시 받지 않는다(메아리 방지)
@@ -31,7 +32,8 @@ ENTER_SEC = 6          # 입구에서 라운지로 걸어 들어오는 동안
 LEAVE_SEC = 20         # 입구로 걸어 나가는 동안
 SAY_SEC = 12           # 말풍선이 떠 있는 시간
 MAX_GUESTS = 8
-_WEBHOOK_RE = re.compile(r"^https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api(?:/v\d+)?/webhooks/(\d+)/([\w-]+)$")
+_WEBHOOK_RE = re.compile(r"^https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api(?:/v\d+)?/webhooks/(\d+)/([\w-]+)(?:[?&](.*))?$")
+_THREAD_RE = re.compile(r"(?:^|&)thread_id=(\d+)(?:&|$)")
 _LOCK = threading.Lock()
 _OUT = collections.deque(maxlen=200)
 _GUESTS = {}           # 디스코드 사용자 → {name, first, last, say, say_t, slot}
@@ -44,8 +46,19 @@ def _env(k, d=""):
 
 
 def webhook():
+    """(웹후크 ID, 주소) - 주소 뒤에 붙은 ?thread_id=... (또는 &thread_id=...)는 떼어 낸다"""
     m = _WEBHOOK_RE.match(_env("LIB3D_DISCORD_WEBHOOK_URL"))
-    return (m.group(1), m.group(0)) if m else (None, None)
+    return (m.group(1), m.group(0).split("?")[0].split("&")[0]) if m else (None, None)
+
+
+def thread_id():
+    """스레드(포럼 글 포함)로 보낼 때: 웹후크 주소 뒤의 thread_id 또는 LIB3D_DISCORD_THREAD_ID"""
+    t = _env("LIB3D_DISCORD_THREAD_ID")
+    if t.isdigit():
+        return t
+    m = _WEBHOOK_RE.match(_env("LIB3D_DISCORD_WEBHOOK_URL"))
+    t = _THREAD_RE.search(m.group(3) or "") if m else None
+    return t.group(1) if t else ""
 
 
 def label():
@@ -65,7 +78,9 @@ def recv_on():
 
 
 def status():
-    return {"send": send_on(), "recv": recv_on(), "label": label(), "channel": _STATE["channel"], "error": _STATE["error"],
+    bad = _env("LIB3D_DISCORD_WEBHOOK_URL") and not webhook()[0]
+    return {"send": send_on(), "recv": recv_on(), "label": label(), "channel": _STATE["channel"],
+            "error": "웹후크 주소 형식이 다릅니다 (https://discord.com/api/webhooks/숫자/토큰)" if bad else _STATE["error"],
             "recv_at": _STATE["recv_at"], "sent_at": _STATE["sent_at"], "kinds": sorted(send_kinds())}
 
 
@@ -140,7 +155,7 @@ def _flush():
                 break
             for _ in range(3):
                 try:
-                    code, data = _req("POST", url + "?wait=false", {"content": text, "username": _username(name),
+                    code, data = _req("POST", url + "?wait=false" + (("&thread_id=" + thread_id()) if thread_id() else ""), {"content": text, "username": _username(name),
                                                                      "allowed_mentions": {"parse": []}})
                 except Exception as e:  # noqa: BLE001
                     _STATE["error"] = "보내기: %s" % e
@@ -202,6 +217,8 @@ def _resolve_channel():
     cid = _env("LIB3D_DISCORD_CHANNEL_ID")
     if cid:
         return cid
+    if thread_id():  # 스레드로 보내면 그 스레드를 읽는다
+        return thread_id()
     wid, url = webhook()
     if not url:
         return ""
