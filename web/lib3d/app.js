@@ -1164,27 +1164,65 @@
       var x = r() * w, y = r() * h, l = 10 + r() * 34; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l / 2, y + (r() - 0.5) * 5, x + l, y); g.stroke();
     }
   }, [26, 5]);
-  var fujiTex = canvasTex(1024, 512, function (g, w, h) {   // 꼭대기가 평평하고 눈이 덮인 큰 산
-    function shape() {
-      g.beginPath(); g.moveTo(0, h); g.bezierCurveTo(w * 0.22, h * 0.9, w * 0.36, h * 0.42, w * 0.445, h * 0.1);
-      g.lineTo(w * 0.47, h * 0.085); g.lineTo(w * 0.5, h * 0.1); g.lineTo(w * 0.53, h * 0.08); g.lineTo(w * 0.555, h * 0.1);
-      g.bezierCurveTo(w * 0.64, h * 0.42, w * 0.78, h * 0.9, w, h); g.closePath();
-    }
-    g.clearRect(0, 0, w, h);
-    var gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#7f8db0'); gr.addColorStop(0.6, '#93a2c0'); gr.addColorStop(1, '#b4c0d4');
-    shape(); g.fillStyle = gr; g.fill();
-    g.save(); shape(); g.clip();
-    var r = rnd(73); g.fillStyle = '#f6f8fc';
-    g.beginPath(); g.moveTo(w * 0.3, 0); g.lineTo(w * 0.7, 0);
-    for (var x = w * 0.7; x >= w * 0.3; x -= w * 0.02) g.lineTo(x, h * (0.3 + r() * 0.2 - Math.abs(x - w * 0.5) / w * 0.25));
-    g.closePath(); g.fill();
-    for (var i = 0; i < 26; i++) {   // 골짜기를 따라 흘러내린 눈
-      var sx = w * (0.4 + r() * 0.2), len = h * (0.18 + r() * 0.3), dx = (sx - w * 0.5) * (0.6 + r());
-      g.strokeStyle = 'rgba(246,248,252,' + (0.35 + r() * 0.45) + ')'; g.lineWidth = 3 + r() * 9;
-      g.beginPath(); g.moveTo(sx, h * 0.3); g.lineTo(sx + dx, h * 0.3 + len); g.stroke();
-    }
-    g.restore();
-  });
+  // 먼 산: 넓고 완만한 큰 산 (정상은 평평한 능선, 오른쪽에 낮은 봉우리와 송신탑, 봉우리 바로 아래에 바위기둥 - 주상절리, 앞에는 겹겹의 낮은 산줄기).
+  // 계절마다 다시 그린다: 겨울은 정상부에 눈, 봄·여름은 초록, 가을은 갈색. 시간(밤·노을)은 재질 색으로 입힌다.
+  var mountCache = {};
+  function mountainTex(season) {
+    if (mountCache[season]) return mountCache[season];
+    var C = { spring: ['#7f9a78', '#5f8062', '#4c6b52', '#3f5c47'], summer: ['#6f9463', '#517c50', '#3f6644', '#33573b'],
+              autumn: ['#9a8a66', '#84704f', '#6b5a42', '#57493a'], winter: ['#8f98ac', '#737d92', '#5d677c', '#4b556a'] }[season] || null;
+    if (!C) C = ['#6f9463', '#517c50', '#3f6644', '#33573b'];
+    var t = canvasTex(1536, 512, function (g, w, h) {
+      var r = rnd(173), winter = season === 'winter';
+      function ridge(pts, jit) {   // 꼭짓점 사이를 잘게 나눠 울퉁불퉁한 능선으로
+        var out = [];
+        for (var i = 0; i < pts.length - 1; i++) for (var k = 0; k < 14; k++) { var u = k / 14; out.push([(pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u) * w, (pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u) * h + (r() - 0.5) * jit]); }
+        out.push([pts[pts.length - 1][0] * w, pts[pts.length - 1][1] * h]);
+        return out;
+      }
+      function fill(line, col) { g.beginPath(); g.moveTo(line[0][0], h); line.forEach(function (p) { g.lineTo(p[0], p[1]); }); g.lineTo(line[line.length - 1][0], h); g.closePath(); if (col) { g.fillStyle = col; g.fill(); } }
+      g.clearRect(0, 0, w, h);
+      // 큰 산 몸통
+      var main = ridge([[0, 0.78], [0.1, 0.66], [0.22, 0.5], [0.31, 0.36], [0.4, 0.22], [0.46, 0.15], [0.53, 0.13], [0.6, 0.16], [0.66, 0.22], [0.72, 0.3], [0.78, 0.29], [0.82, 0.25], [0.87, 0.31], [0.94, 0.5], [1, 0.7]], 7);
+      var gr = g.createLinearGradient(0, h * 0.12, 0, h); gr.addColorStop(0, C[0]); gr.addColorStop(0.55, C[1]); gr.addColorStop(1, C[1]);
+      fill(main, gr);
+      g.save(); fill(main); g.clip();
+      for (var i = 0; i < 90; i++) {   // 골짜기 그늘과 능선 빛 (정상에서 아래로 갈라지는 주름)
+        var sx = w * (0.08 + r() * 0.86), sy = h * (0.14 + r() * 0.45), len = h * (0.12 + r() * 0.3), dx = (sx - w * 0.53) * (0.25 + r() * 0.5);
+        g.strokeStyle = (i % 2 ? 'rgba(0,0,0,' : 'rgba(255,255,255,') + (0.05 + r() * 0.09) + ')'; g.lineWidth = 4 + r() * 16;
+        g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(sx + dx * 0.4, sy + len * 0.5, sx + dx, sy + len); g.stroke();
+      }
+      if (winter) {   // 정상부에 내려앉은 눈 (아래로 갈수록 성기게)
+        for (var n = 0; n < 3200; n++) { var nx = w * (0.28 + r() * 0.6), ny = h * (0.1 + Math.pow(r(), 2.2) * 0.3); g.fillStyle = 'rgba(246,248,252,' + (0.12 + r() * 0.3) + ')'; g.beginPath(); g.ellipse(nx, ny, 5 + r() * 16, 2 + r() * 5, (nx - w * 0.53) / w * 1.2, 0, 6.3); g.fill(); }
+        g.fillStyle = 'rgba(246,248,252,0.75)'; fill(ridge([[0.36, 0.3], [0.42, 0.22], [0.47, 0.17], [0.53, 0.15], [0.6, 0.18], [0.65, 0.24], [0.7, 0.31]], 12), 'rgba(246,248,252,0.0)');
+        for (var st = 0; st < 40; st++) { var qx = w * (0.38 + r() * 0.34), ql = h * (0.06 + r() * 0.16); g.strokeStyle = 'rgba(246,248,252,' + (0.3 + r() * 0.4) + ')'; g.lineWidth = 3 + r() * 9; g.beginPath(); g.moveTo(qx, h * 0.2); g.lineTo(qx + (qx - w * 0.53) * 0.4, h * 0.2 + ql); g.stroke(); }
+      } else {   // 숲의 얼룩
+        for (var f = 0; f < 1800; f++) { g.fillStyle = 'rgba(' + (r() < 0.5 ? '20,50,25,' : '200,220,150,') + r() * 0.1 + ')'; g.beginPath(); g.arc(r() * w, h * (0.14 + r() * 0.8), 4 + r() * 10, 0, 6.3); g.fill(); }
+      }
+      // 봉우리 바로 아래의 바위기둥 무리 (주상절리): 정상 능선 밑에 세로로 선 회색 돌기둥이 들쭉날쭉
+      [[0.395, 0.455, 0.225, 0.075], [0.47, 0.565, 0.165, 0.08], [0.585, 0.645, 0.2, 0.075], [0.795, 0.835, 0.27, 0.05]].forEach(function (b) {
+        for (var x = b[0] * w; x < b[1] * w;) {
+          var cw = 3 + r() * 5, ch = h * b[3] * (0.35 + r() * 0.65), base = h * (b[2] + b[3]) + (r() - 0.5) * 10 + Math.sin(x / 40) * 5, tone = 108 + Math.floor(r() * 62);
+          if (r() < 0.82) {
+            g.fillStyle = 'rgb(' + tone + ',' + (tone - 3) + ',' + (tone - 9) + ')'; g.fillRect(x, base - ch, cw, ch);
+            g.fillStyle = 'rgba(255,255,255,0.22)'; g.fillRect(x, base - ch, 1.5, ch); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x + cw - 1.5, base - ch, 1.5, ch);
+            if (winter) { g.fillStyle = 'rgba(246,248,252,0.85)'; g.fillRect(x, base - ch, cw, 3); }
+          }
+          x += cw + (r() < 0.2 ? 4 + r() * 8 : 0.5);
+        }
+        for (var bsh = 0; bsh < 70; bsh++) { g.fillStyle = winter ? 'rgba(235,240,246,' + (0.4 + r() * 0.4) + ')' : (r() < 0.5 ? C[1] : C[2]); g.beginPath(); g.arc(w * (b[0] - 0.01 + r() * (b[1] - b[0] + 0.02)), h * (b[2] + b[3]) + (r() - 0.3) * 16, 3 + r() * 6, 0, 6.3); g.fill(); }   // 기둥 밑동의 수풀
+      });
+      g.restore();
+      // 오른쪽 봉우리의 송신탑
+      g.strokeStyle = 'rgba(70,74,84,0.9)'; g.lineWidth = 2; [[0.815, 0.25, 26], [0.826, 0.255, 18]].forEach(function (a) { g.beginPath(); g.moveTo(a[0] * w, a[1] * h); g.lineTo(a[0] * w, a[1] * h - a[2]); g.stroke(); });
+      // 앞의 낮은 산줄기 둘 (가까울수록 짙게)
+      fill(ridge([[0, 0.7], [0.08, 0.63], [0.16, 0.68], [0.25, 0.6], [0.34, 0.66], [0.43, 0.61], [0.5, 0.67], [0.6, 0.62], [0.7, 0.68], [0.8, 0.61], [0.9, 0.66], [1, 0.62]], 9), C[2]);
+      fill(ridge([[0, 0.8], [0.1, 0.76], [0.2, 0.8], [0.3, 0.74], [0.42, 0.79], [0.55, 0.75], [0.66, 0.8], [0.77, 0.75], [0.88, 0.8], [1, 0.76]], 8), C[3]);
+      for (var tr = 0; tr < 700; tr++) { g.fillStyle = 'rgba(' + (winter ? '230,235,242,' : '15,40,22,') + (0.1 + r() * 0.2) + ')'; g.beginPath(); g.arc(r() * w, h * (0.64 + r() * 0.36), 3 + r() * 6, 0, 6.3); g.fill(); }
+    });
+    mountCache[season] = t;
+    return t;
+  }
   var flareTex = canvasTex(128, 128, function (g, w, h) {   // 랜턴 불빛 (가운데 빛 + 가는 빛줄기)
     g.clearRect(0, 0, w, h);
     var gr = g.createRadialGradient(64, 64, 1, 64, 64, 62); gr.addColorStop(0, 'rgba(255,236,190,1)'); gr.addColorStop(0.18, 'rgba(255,190,90,0.55)'); gr.addColorStop(1, 'rgba(255,170,60,0)');
@@ -1224,7 +1262,7 @@
     chair: new T.MeshStandardMaterial({ color: 0x4a5a48, roughness: 0.9 }),
     cooler: new T.MeshStandardMaterial({ color: 0xd9e4ea, roughness: 0.6 }),
     lot: new T.MeshStandardMaterial({ color: 0x77736c, roughness: 1 }),
-    fuji: new T.MeshBasicMaterial({ map: fujiTex, alphaTest: 0.5, fog: false, side: T.DoubleSide }),
+    fuji: new T.MeshBasicMaterial({ map: mountainTex('summer'), alphaTest: 0.5, fog: false, side: T.DoubleSide }),
     flare: new T.SpriteMaterial({ map: flareTex, blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })
   };
   Object.keys(CAMP).forEach(function (k) { [].concat(CAMP[k]).forEach(function (m) { m.userData.keep = true; m.userData.envSet = true; }); });
@@ -1251,7 +1289,8 @@
     CAMP.pine.forEach(function (m, i) { tint(m, winter ? [0x9fb0a4, 0xaebcb2, 0x8fa398][i] : [0x2f5a3c, 0x3a6a45, 0x274d35][i]); });
     CAMP.lamp.emissive.setHex(lit ? 0xffc46a : 0x000000);
     CAMP.flare.opacity = night ? 0.7 : dusk ? 0.35 : 0;
-    CAMP.fuji.color.setHex(night ? 0x4d4f86 : dusk ? 0xf2b9a0 : grey ? 0xc3c8cf : 0xffffff);
+    CAMP.fuji.color.setHex(night ? 0x3d4270 : dusk ? 0xf2b9a0 : grey ? 0xc3c8cf : 0xffffff);
+    var mt = mountainTex(o.season); if (CAMP.fuji.map !== mt) { CAMP.fuji.map = mt; CAMP.fuji.needsUpdate = true; }
     [CAMP.bank, CAMP.wood, CAMP.dirt, CAMP.canopy, CAMP.stone, CAMP.hammock, CAMP.chair, CAMP.cooler].concat(CAMP.tent, CAMP.pine).forEach(function (m) { m.envMapIntensity = envOut; });
     if (campFx) { campFx.night = night ? 1 : dusk ? 0.6 : grey ? 0.4 : 0.25; campFx.dark = night; }
     BIRD.mats.forEach(function (m) { m.color.setScalar(Math.max(0.35, f)); m.envMapIntensity = envOut; });
@@ -1295,7 +1334,7 @@
       });
     });
     // 먼 산 (경치 그림 바로 앞의 큰 판) + 캠핑장 뒤 침엽수 숲
-    var fuji = new T.Mesh(new T.PlaneGeometry(250, 82), CAMP.fuji); fuji.rotation.y = Math.PI; add(fuji, 0, gy + 41 - 3, farZ);
+    var fuji = new T.Mesh(new T.PlaneGeometry(250, 83), CAMP.fuji); fuji.rotation.y = Math.PI; add(fuji, 0, gy + 41.5 - 16, farZ);   // 아래 산줄기는 숲 뒤로 내려 앉힌다
     function pine(x, z, s) {
       var tr = new T.Mesh(pineTrunkGeo, M.trunk); tr.scale.setScalar(s * 0.8); add(tr, x, gy, z);
       var pn = new T.Mesh(pineTreeGeo, CAMP.pine[Math.floor(r() * 3)]); pn.scale.set(s * (0.72 + r() * 0.16), s * (0.74 + r() * 0.2), s * (0.72 + r() * 0.16)); pn.rotation.y = r() * 6; add(pn, x, gy - 0.3 * s, z);
