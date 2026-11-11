@@ -2943,12 +2943,20 @@
   el('l3d-close').addEventListener('click', closeCard);
   el('l3d-open').addEventListener('click', function () { if (pickedInfo && pickedInfo.url) window.open(pickedInfo.url, '_blank', 'noopener'); });
   el('l3d-read').addEventListener('click', function () { if (picked) openReader(picked); });
-  function backUrl() { return location.href.split('#')[0] + '#hall'; }
+  // BookOasis 뷰어는 새 탭으로 (서재는 그대로 두고, 다 읽으면 탭만 닫으면 됨).
+  // 주소를 서버에 묻는 동안 팝업 차단에 걸리지 않게 누른 순간 빈 탭을 먼저 연다
+  function openBoViewer(kiosk, tab) {
+    var w = tab || window.open('about:blank', '_blank');
+    if (!w) { location.href = kiosk; return; }   // 팝업이 막힌 브라우저: 예전처럼 이 창에서
+    try { w.opener = null; } catch (e) { /* 무시 */ }
+    w.location.href = kiosk;
+  }
   el('l3d-read-bo').addEventListener('click', function () {
     if (!picked) return;
-    api('api/lib3d/book?b=' + encodeURIComponent(picked.key)).then(function (info) {
-      location.href = info.kiosk + '&return=' + encodeURIComponent(backUrl());
-    }).catch(function (e) { el('l3d-card-path').textContent = e.message; });
+    var tab = window.open('about:blank', '_blank');
+    api('api/lib3d/kiosk?b=' + encodeURIComponent(picked.key)).then(function (info) {
+      openBoViewer(info.url, tab);
+    }).catch(function (e) { if (tab) tab.close(); el('l3d-card-path').textContent = e.message; });
   });
 
   // ── 뷰어 (서재 안에서 읽기): 두 손에 든 책, 책장 넘김 ──
@@ -3182,7 +3190,7 @@
   });
   window.addEventListener('resize', function () { if (reading && R.info && !R.scroll && R.info.kind !== 'pdf') render(); });
   el('l3d-r-bo').addEventListener('click', function () {
-    if (R.info) location.href = R.info.kiosk + '&return=' + encodeURIComponent(backUrl());
+    if (R.info) openBoViewer(R.info.kiosk);
   });
 
   // ── 설정: 보여 줄 보관함 ──

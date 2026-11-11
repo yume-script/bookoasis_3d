@@ -393,6 +393,8 @@ class Handler(BaseHTTPRequestHandler):
             b = (q.get("b") or [""])[0]
             if path == "/api/lib3d/volumes":
                 return self._send(200, {"success": True, "volumes": lib3d.volumes(key or b)})
+            if path == "/api/lib3d/kiosk":   # BookOasis 뷰어로 읽기 (새 탭)
+                return self._send(200, {"success": True, "url": lib3d.kiosk_url(b)})
             if path == "/api/lib3d/book":
                 return self._send(200, dict(lib3d.book_info(b), success=True))
             if path == "/api/lib3d/page":

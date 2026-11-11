@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 
 from . import bookoasis_db, config
 
-VERSION = "2.46.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
+VERSION = "2.46.1"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
 CACHE_SEC = 300
 COVER_WIDTH = 200
 _DATA = {"at": 0.0, "v": None}
@@ -751,6 +751,12 @@ def book_info(bkey):
             "title": row.get("title") or os.path.splitext(os.path.basename(path))[0],
             "series": row.get("series_name") or "",
             "kiosk": "%s/?kiosk=1&book=%s&type=%s" % (public_url(), row["id"], quote(db_type))}
+
+
+def kiosk_url(bkey):
+    """BookOasis 뷰어(키오스크) 주소 - 파일은 열지 않는다 (이 서버에서 파일이 안 보여도 BookOasis에서는 읽을 수 있게)"""
+    db_type, row = _book(bkey)
+    return "%s/?kiosk=1&book=%s&type=%s" % (public_url(), row["id"], quote(db_type))
 
 
 def page(bkey, index):
