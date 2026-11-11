@@ -2550,31 +2550,67 @@
     }
   }
 
+  // 걷는 손님: 서점 안 아무 곳(통로 격자의 한 점)을 목적지로 골라 통로를 따라 꺾어 가며 간다.
+  // 가로 먼저/세로 먼저를 그때그때 고르고, 통로 폭 안에서 좌우로 흩어져 걷는다. 서가 줄에 닿으면 가끔 서가 앞에 서서 둘러본다.
+  // (통로로만 다니므로 서가·벽을 뚫지 않는다)
+  function planRoute(p) {
+    var L = layout, li = p.node[0], zi = p.node[1], lanes = L.lanes, rows = L.rowsZ, route = [];
+    var gl = Math.floor(p.r() * lanes.length), gz = Math.floor(p.r() * rows.length);
+    if (p.r() < 0.35) { gl = Math.max(0, Math.min(lanes.length - 1, li + (p.r() < 0.5 ? -1 : 1))); gz = zi; }   // 가끔은 가까운 곳만
+    if (gl === li && gz === zi) gl = li > 0 ? li - 1 : Math.min(lanes.length - 1, li + 1);
+    function pt(l, z) {
+      return { node: [l, z], x: lanes[l] + (p.r() - 0.5) * 3.0, z: rows[z] + (p.r() - 0.5) * (z === 0 ? 3.2 : 2.6) };
+    }
+    if (p.r() < 0.5) { if (gl !== li) route.push(pt(gl, zi)); if (gz !== zi) route.push(pt(gl, gz)); }   // 줄을 따라 옆으로 → 통로로 앞뒤
+    else { if (gz !== zi) route.push(pt(li, gz)); if (gl !== li) route.push(pt(gl, gz)); }             // 통로로 앞뒤 → 줄을 따라 옆으로
+    if (!route.length) route.push(pt(gl, gz));
+    // 서가 줄에 닿았으면 가끔 옆 구역 서가 앞에 서서 둘러보고(몇 초), 다시 통로로 나온다
+    if (gz > 0 && !p.alwaysWalk && p.r() < (p.robot ? 0.25 : 0.45)) {
+      var near = (L.sections || []).filter(function (sc) {
+        return Math.abs(sc.z + BOOTH_D / 2 + GAP / 2 - rows[gz]) < 1 && Math.abs(sc.x - lanes[gl]) < BOOTH_W / 2 + GAP;
+      });
+      if (near.length) {
+        var sc = near[Math.floor(p.r() * near.length)], bx = sc.x + (p.r() - 0.5) * 2.6;
+        route.push({ node: [gl, gz], x: bx, z: sc.z + 3.15, lookYaw: Math.PI, stop: 3 + p.r() * 6 });
+        route.push({ node: [gl, gz], x: bx + (p.r() - 0.5) * 1.2, z: rows[gz] + (p.r() - 0.5) * 1.6 });   // 서가 앞 통로로 한 걸음 나와서
+        route.push(pt(gl, gz));   // 세로 통로로 돌아간다 (다음 길이 서가를 가로지르지 않게)
+      }
+    }
+    p.route = route;
+  }
   function nextNode(p) {
-    var L = layout, li = p.node[0], zi = p.node[1], opts = [];
-    if (li > 0) opts.push([li - 1, zi]);
-    if (li < L.lanes.length - 1) opts.push([li + 1, zi]);
-    if (zi > 0) opts.push([li, zi - 1]);
-    if (zi < L.rowsZ.length - 1) opts.push([li, zi + 1]);
-    if (p.prev && opts.length > 1) opts = opts.filter(function (o) { return o[0] !== p.prev[0] || o[1] !== p.prev[1]; });
-    var o = opts[Math.floor(p.r() * opts.length)];
-    p.prev = p.node; p.node = o;
-    p.tx = L.lanes[o[0]] + (p.r() - 0.5) * 1.2; p.tz = L.rowsZ[o[1]] + (p.r() - 0.5) * 1.2;
-    if (!p.alwaysWalk && p.r() < (p.robot ? 0.35 : 0.18)) p.pause = 1 + p.r() * 3;   // 가끔 멈춰 두리번 (로봇은 자주 멈춰 동작)
+    if (!layout) return;
+    if (!p.route || !p.route.length) planRoute(p);
+    var o = p.route.shift();
+    p.prev = p.node; p.node = o.node;
+    p.tx = o.x; p.tz = o.z;
+    p.speedK = 0.8 + p.r() * 0.45;   // 구간마다 걸음 빠르기를 조금씩
+    p.lookYaw = null;
+    if (p.arrive) {   // 지난 목적지에서 할 일 (서가 앞이면 그쪽을 보고 선다)
+      p.lookYaw = p.arrive.lookYaw; p.pause = p.arrive.stop;
+      p.arrive = null;
+    } else if (!p.alwaysWalk && p.r() < (p.robot ? 0.35 : 0.12)) {
+      p.pause = 0.6 + p.r() * 2.6;   // 가끔 멈춰 두리번 (로봇은 자주 멈춰 동작)
+      p.lookYaw = p.g.rotation.y + (p.r() - 0.5) * 2.4;
+    }
+    if (o.stop) { p.arrive = { lookYaw: o.lookYaw, stop: o.stop }; }
+  }
+  function turnTo(p, yaw, k) {
+    var cur0 = p.g.rotation.y, diff = Math.atan2(Math.sin(yaw - cur0), Math.cos(yaw - cur0));
+    p.g.rotation.y = cur0 + diff * Math.min(1, k);
   }
 
   function updateHuman(p, dt, now) {
     var moving = false;
     if (p.kind === 'walk') {
-      if (p.pause > 0) p.pause -= dt;
+      if (p.pause > 0) { p.pause -= dt; if (p.lookYaw != null) turnTo(p, p.lookYaw, dt * 3); }
       else {
         var dx = p.tx - p.g.position.x, dz = p.tz - p.g.position.z, d = Math.hypot(dx, dz);
         if (d < 0.15) nextNode(p);
         else {
           moving = true;
-          var want = Math.atan2(dx, dz), cur0 = p.g.rotation.y, diff = Math.atan2(Math.sin(want - cur0), Math.cos(want - cur0));
-          p.g.rotation.y = cur0 + diff * Math.min(1, dt * 5);
-          var stepLen = Math.min(d, p.speed * dt * p.walkW);
+          turnTo(p, Math.atan2(dx, dz), dt * 5);
+          var stepLen = Math.min(d, p.speed * (p.speedK || 1) * dt * p.walkW);
           p.g.position.x += dx / d * stepLen; p.g.position.z += dz / d * stepLen;
         }
       }
@@ -2584,7 +2620,7 @@
     if (p.robot) updateRobot(p, dt, now);
     p.walkW += ((moving ? 1 : 0) - p.walkW) * Math.min(1, dt * 4);
     var ew = p.emote ? p.emote.act.getEffectiveWeight() : 0;   // 로봇이 동작 중이면 그만큼 서 있기를 덜 섞는다
-    if (p.acts.walk) { p.acts.walk.setEffectiveWeight(p.walkW * (1 - ew)); p.acts.walk.timeScale = p.speed / 1.25 * (p.walkRate || 1); }
+    if (p.acts.walk) { p.acts.walk.setEffectiveWeight(p.walkW * (1 - ew)); p.acts.walk.timeScale = p.speed * (p.speedK || 1) / 1.25 * (p.walkRate || 1); }
     if (p.acts.idle) p.acts.idle.setEffectiveWeight((1 - p.walkW) * (1 - ew));
     p.mixer.update(dt);
     applyLook(p, now);
@@ -2597,15 +2633,15 @@
       if (p.kind === 'walk') {
         if (p.pause > 0) {
           p.pause -= dt;
+          if (p.lookYaw != null) turnTo(p, p.lookYaw, dt * 3);
           p.legL.rotation.x *= 0.85; p.legR.rotation.x *= 0.85; p.armL.rotation.x *= 0.85; p.armR.rotation.x *= 0.85;
           p.head.rotation.y = Math.sin(now / 700 + p.phase) * 0.6;
           continue;
         }
         var dx = p.tx - p.g.position.x, dz = p.tz - p.g.position.z, d = Math.hypot(dx, dz);
         if (d < 0.15) { nextNode(p); continue; }
-        var want = Math.atan2(dx, dz), cur = p.g.rotation.y, diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-        p.g.rotation.y = cur + diff * Math.min(1, dt * 6);
-        var stepLen = Math.min(d, p.speed * dt);
+        turnTo(p, Math.atan2(dx, dz), dt * 6);
+        var stepLen = Math.min(d, p.speed * (p.speedK || 1) * dt);
         p.g.position.x += dx / d * stepLen; p.g.position.z += dz / d * stepLen;
         p.phase += dt * p.speed * 5.2;
         var sw = Math.sin(p.phase);
