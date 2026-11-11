@@ -390,6 +390,25 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 
 두 경우 모두 `agent` `{id, name, job}`(맡은 직원), `server: "bookoasis_lib3d"`가 함께 옵니다.
 
+### 6-9. 디스코드 채널 연동 (선택, 기본 꺼짐)
+
+디스코드 채널 하나와 1층 채팅을 잇습니다. 디스코드 봇 프로그램을 따로 돌릴 필요가 없고, 이 서버로 들어오는 연결도 없습니다(서재가 디스코드로 나가서 보내고 읽음). `.env`에 넣고 다시 시작하면 켜집니다.
+
+| `.env` | 하는 일 |
+|---|---|
+| `LIB3D_DISCORD_WEBHOOK_URL` | **보내기**: 채널 [설정 > 연동 > 웹후크 > 새 웹후크]의 주소. 3D 서재 채팅이 "이름 (3D 서재)"로 올라갑니다 |
+| `LIB3D_DISCORD_BOT_TOKEN` | **받기**: 디스코드 개발자 페이지(discord.com/developers)에서 앱 → Bot → 토큰. 같은 페이지에서 **Message Content Intent**를 켜고, OAuth2 URL로 서버에 초대(채널 보기·메시지 기록 보기 권한) |
+| `LIB3D_DISCORD_CHANNEL_ID` | 읽을 채널 (비우면 웹후크가 걸린 채널) |
+| `LIB3D_DISCORD_LABEL` | 디스코드에서 온 사람 이름표 (예: `출판사` → **[출판사] 애순이**) |
+| `LIB3D_DISCORD_SEND` | 보낼 것: `chat`(사람 채팅) `staff`(AI 직원·손님의 말) `delivery`(배달 도착), 기본 `chat,staff` |
+| `LIB3D_DISCORD_POLL_SEC` | 디스코드를 읽는 간격(초, 기본 3) |
+
+- 디스코드에서 한 말은 몇 초 안에 **1층 채팅**에 "[출판사] 애순이: …"로 보이고, 말한 사람이 **1층 라운지에 손님**(파란 이름표)으로 들어와 말풍선을 띄웁니다. 말이 3분 끊기면 입구로 나갑니다(동시에 8명까지).
+- 다른 봇·웹후크가 쓴 글(예: 디스코드 봇의 인물들)도 받습니다. 이 서재가 웹후크로 보낸 글만은 다시 받지 않아, 같은 채널에 걸어도 메아리가 생기지 않습니다.
+- 귓속말(`@사서` 문답)과 성인 층 채팅은 보내지 않고, `@everyone` 같은 멘션은 막습니다. 디스코드 쪽 글은 AI 직원을 부르지 않습니다.
+- 켜고 처음 읽을 때는 그전 대화를 건너뛰고 그 뒤에 올라온 글부터 받습니다.
+- 상태(마지막으로 보낸·받은 시각, 오류)는 [서재 설정 > AI 직원 > 기본·배달]에 나옵니다.
+
 ---
 
 ## 7. 관리자 설정 메뉴
@@ -435,6 +454,7 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 | `LIB3D_AI_ASK` | `false` | AI 직원 응대 |
 | `LIB3D_MCP_COMMAND` / `LIB3D_MCP_SERVERS` / `LIB3D_AI_BUILTIN` | - / - / `true` | AI 도구 |
 | `LIB3D_EVENT_TOKEN` | (비움) | 바깥 프로그램이 배달·직원의 말을 보내는 `POST /api/lib3d/events` 토큰 ([6-8](#6-8-배달과-바깥-ai-전화)) |
+| `LIB3D_DISCORD_*` | (비움) | 디스코드 채널 연동 - 웹후크(보내기)·봇 토큰(받기)·채널·이름표·보낼 것·간격 ([6-9](#6-9-디스코드-채널-연동-선택-기본-꺼짐)) |
 | `MINI_ENABLED` / `MINI_COVERS_DIR` | `true` / - | 미니게임(오락실) / 그림 땅따먹기 표지 폴더 |
 
 ---

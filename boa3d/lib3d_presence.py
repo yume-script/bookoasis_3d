@@ -17,6 +17,22 @@ _STATE = {}            # 사용자 → {floor, x, z, yaw, moving, reading, t}
 _CHAT = []             # [{id, user, floor, text, t}]
 _SEQ = {"chat": 0}
 _LAST_SAY = {}
+_LISTENERS = []        # 새 채팅을 받을 함수 (디스코드 보내기) - 귓속말은 주지 않는다
+
+
+def add_listener(fn):
+    if fn not in _LISTENERS:
+        _LISTENERS.append(fn)
+
+
+def _notify(msg):
+    if msg.get("to"):
+        return
+    for fn in list(_LISTENERS):
+        try:
+            fn(msg)
+        except Exception:  # noqa: BLE001 - 바깥 연동이 채팅을 막으면 안 된다
+            pass
 
 
 def _num(v, lo=-1e4, hi=1e4):
@@ -75,17 +91,18 @@ def update(key, body, name=None):
     return {"others": others, "online": online, "chat": chat, "chat_id": _SEQ["chat"], "me": key}
 
 
-def post(user, text, floor="", to=None, books=None):
-    """서버가 남기는 메시지 (to가 있으면 그 사람에게만)"""
+def post(user, text, floor="", to=None, books=None, src="staff"):
+    """서버가 남기는 메시지 (to가 있으면 그 사람에게만). src: staff(AI 직원·손님) | delivery | discord"""
     with _LOCK:
         _SEQ["chat"] += 1
-        msg = {"id": _SEQ["chat"], "user": user, "floor": str(floor or "")[:40], "text": str(text)[:4000], "t": time.time()}
+        msg = {"id": _SEQ["chat"], "user": user, "floor": str(floor or "")[:40], "text": str(text)[:4000], "t": time.time(), "src": src}
         if to:
             msg["to"] = to
         if books:
             msg["books"] = books
         _CHAT.append(msg)
         del _CHAT[:-CHAT_KEEP]
+    _notify(msg)
     return msg
 
 
@@ -135,9 +152,10 @@ def say(key, text, floor, name=None):
             raise ValueError("너무 빨리 보냈습니다. 잠시 뒤에 다시 보내 주세요.")
         _LAST_SAY[key] = now
         _SEQ["chat"] += 1
-        msg = {"id": _SEQ["chat"], "user": name or key.split("#")[0], "floor": str(floor or "")[:40], "text": text, "t": now}
+        msg = {"id": _SEQ["chat"], "user": name or key.split("#")[0], "floor": str(floor or "")[:40], "text": text, "t": now, "src": "user"}
         _CHAT.append(msg)
         del _CHAT[:-CHAT_KEEP]
+    _notify(msg)
     return msg
 
 

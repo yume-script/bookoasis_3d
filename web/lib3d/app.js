@@ -3561,6 +3561,11 @@
       recent.forEach(function (x) { var r = document.createElement('div'); r.textContent = new Date(x.t * 1000).toLocaleString() + ' · ' + (x.from || (x.src === 'webtoon' ? '웹툰 다운로더' : '배달원')) + ' · ' + x.text; rl.appendChild(r); });
       h4(dfs, '최근 배달'); dfs.appendChild(rl);
     }
+    var dc = d.discord || {}, dcs = section('기본·배달', 'card');
+    h4(dcs, '디스코드 채널 연동 (.env)');
+    note(dcs, (dc.send || dc.recv ? '보내기 ' + (dc.send ? '켬 (' + (dc.kinds || []).join(', ') + ')' : '끔') + ' · 받기 ' + (dc.recv ? '켬 - 말한 사람은 [' + dc.label + '] 이름으로 1층 라운지에' : '끔') +
+      (dc.recv_at ? ' · 마지막 받음 ' + new Date(dc.recv_at * 1000).toLocaleTimeString() : '') + (dc.sent_at ? ' · 마지막 보냄 ' + new Date(dc.sent_at * 1000).toLocaleTimeString() : '')
+      : '꺼짐 - .env의 LIB3D_DISCORD_WEBHOOK_URL(보내기)·LIB3D_DISCORD_BOT_TOKEN(받기)을 넣고 다시 시작하세요.') + (dc.error ? ' · ⚠ ' + dc.error : ''));
     // ── 사람마다 접고 펴는 카드 (서재 직원 / 길 건너 / AI 손님) ──
     var STREET_POST = { office: 1, gallery: 1, jazz: 1 }, firstOf = {};
     var guestSec = null;
@@ -5012,12 +5017,12 @@
   }
   function setStaffTag(p, s, msg) {   // 직원은 청록, AI 손님은 호박색 이름표
     if (p.tag) { p.g.remove(p.tag); p.tag.material.map.dispose(); p.tag.material.dispose(); }
-    p.tag = nameTag(s.name + ' · ' + s.job, msg, s.kind === 'guest' ? '#ffcf7a' : s.kind === 'courier' ? '#ff9f6b' : s.post === 'office' ? '#ffd166' : (s.post === 'gallery' || s.post === 'jazz') ? '#9fd3ff' : '#7ee0c3');
+    p.tag = nameTag(s.job ? s.name + ' · ' + s.job : s.name, msg, s.kind === 'guest' ? '#ffcf7a' : s.kind === 'courier' ? '#ff9f6b' : s.kind === 'discord' ? '#a5b4ff' : s.post === 'office' ? '#ffd166' : (s.post === 'gallery' || s.post === 'jazz') ? '#9fd3ff' : '#7ee0c3');
     p.tag.position.y = 2.15 + (msg ? 0.2 : 0); p.g.add(p.tag);
   }
   function syncStaff(d) {
     if (!d || !floorGroup || !layout) return;
-    staffData = (d.agents || []).concat(cur === 0 ? d.deliveries || [] : []);   // 배달원은 1층 입구로 와서 안내 데스크에 상자를 놓고 간다
+    staffData = (d.agents || []).concat(cur === 0 ? d.deliveries || [] : []);   // 배달원·디스코드 손님은 1층에만 (배달원은 안내 데스크로, 디스코드 손님은 라운지로)
     Object.keys(staffNPC).forEach(function (k) {   // 나간 손님(목록에서 빠진 사람)은 지운다
       if (staffData.some(function (s) { return s.id === k; })) return;
       var gone = staffNPC[k]; if (gone.g.parent) gone.g.parent.remove(gone.g); disposeGroup(gone.g); delete staffNPC[k];
@@ -5045,6 +5050,9 @@
         var q = placePos(s.target); if (q) { pos = [q[0], q[1]]; face = q[2]; }
       }
       if (!pos && s.target !== 'book') { var h = placePos(s.post) || placePos('lobby'); pos = [h[0], h[1]]; face = h[2]; }
+      if (pos && s.kind === 'discord') {   // 디스코드 손님은 라운지에 나란히 (자리 번호대로)
+        var sl = s.slot || 0; pos = [pos[0] + ((sl % 4) - 1.5) * 1.1, pos[1] + Math.floor(sl / 4) * 1.2 - 0.6];
+      }
       if (pos) { p.tx = pos[0]; p.tz = pos[1]; p.face = face; }   // 이 화면에 없는 책이면 그 자리에 머문다
       var say = s.say || '';
       if (say !== (p.lastSay || '')) { p.lastSay = say; setStaffTag(p, s, say); }

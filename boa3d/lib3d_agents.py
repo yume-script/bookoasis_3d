@@ -20,7 +20,7 @@ import threading
 import time
 import urllib.request
 
-from . import config, lib3d, lib3d_ai, lib3d_events, lib3d_presence
+from . import config, lib3d, lib3d_ai, lib3d_discord, lib3d_events, lib3d_presence
 
 log = logging.getLogger("boa3d.lib3d_agents")
 
@@ -816,7 +816,7 @@ def public(floor):
         if e.pop("private", False):
             e["title"], e["text"] = "이용자 응대", "이용자를 도와 책을 찾아 드렸어요." if e.get("agent") == "librarian" else "이용자를 안내했어요."
         logs.append(e)
-    return {"agents": out, "board": st.get("board") or {}, "log": logs, "deliveries": _deliveries(), "ground": _ground_floor()}
+    return {"agents": out, "board": st.get("board") or {}, "log": logs, "deliveries": _deliveries() + lib3d_discord.public(), "ground": _ground_floor()}
 
 
 def _deliveries():
@@ -832,7 +832,7 @@ def _deliveries():
     name = d["from"] or s["name"]
     if d["elapsed"] >= 10 and lib3d_events.first_arrival(d):
         text = lib3d_events.summary(d["items"])
-        lib3d_presence.post("%s (배달)" % name, "📦 " + (d["note"] or text + " 왔습니다!"), _ground_floor())
+        lib3d_presence.post("%s (배달)" % name, "📦 " + (d["note"] or text + " 왔습니다!"), _ground_floor(), src="delivery")
         add_log("delivery", "배달 도착", (d["note"] + " · " if d["note"] else "") + text, name=name)
     return [{"id": "dlv_" + d["id"], "kind": "courier", "name": name, "job": "배달", "call": "", "post": "entrance",
              "look": s["look"], "target": d["target"], "say": d["say"], "book": "", "book_title": ""}]
@@ -845,4 +845,5 @@ def admin_info():
     st = state()
     return {"config": cfg, "last_run": st["last_run"], "present": lib3d_presence.active_count(), "log": st["log"][-40:][::-1], "budget": lib3d_ai.budget(),
             "notes": {k: v.get("notes", []) for k, v in st["agents"].items()}, "configured": lib3d_ai.configured(),
-            "deliveries": lib3d_events.recent(), "events_on": bool(config.env("LIB3D_EVENT_TOKEN", "").strip())}
+            "deliveries": lib3d_events.recent(), "events_on": bool(config.env("LIB3D_EVENT_TOKEN", "").strip()),
+            "discord": lib3d_discord.status()}
