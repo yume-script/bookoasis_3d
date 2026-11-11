@@ -1082,7 +1082,7 @@
       for (var bz = back - 50; bz < front + 50;) {   // 건너편 건물들
         var bw = 10 + r() * 14, bd = 10 + r() * 10, bh = 9 + Math.pow(r(), 1.6) * 34;
         var mat = M.facade[Math.floor(r() * M.facade.length)];
-        if (bz + bw > rz0 - 1) break;   // 건물은 강가까지만 (강 건너는 숲과 캠핑장)
+        if (bz + bw > rz0 - 1) { if (rz0 - 1 - bz < 9) break; bw = rz0 - 1 - bz; }   // 건물은 강가까지만 - 남은 자리가 9m 넘으면 거기에 맞춰 짓는다 (서재 옆 건물 자리를 잃지 않게)
         var bld = new T.Mesh(bldGeo(bd, bh, bw), mat); bld.scale.set(bd, bh, bw);
         var bx = side * (w / 2 + 18 + bd / 2 + r() * 6);
         add(bld, bx, gy + bh / 2, bz + bw / 2);
@@ -1090,7 +1090,7 @@
         var aw = new T.Mesh(unitBox, M.awning[Math.floor(r() * M.awning.length)]); aw.scale.set(1.4, 0.12, bw * 0.8);   // 차양
         aw.rotation.z = side * 0.25; add(aw, bx - side * (bd / 2 + 0.6), gy + 3.6, bz + bw / 2);
         var cap = new T.Mesh(unitBox, M.parapet); cap.scale.set(bd + 0.3, 0.5, bw + 0.3); add(cap, bx, gy + bh + 0.25, bz + bw / 2);   // 옥상 난간
-        var mid = bz + bw / 2, nm = null, near = mid > back && mid < front;   // 걸어갈 수 있는 서재 옆 건물
+        var mid = bz + bw / 2, nm = null, near = mid > back && mid < rz0 - 4;   // 걸어갈 수 있는 서재 옆 건물
         var plain = STREET.signs.filter(function (n) { return [STREET.gallery, STREET.jazz, STREET.office].indexOf(n) < 0; });
         if (near && side > 0 && STREET.gallery && !signed.gallery) { signed.gallery = true; nm = STREET.gallery; }
         else if (near && side > 0 && STREET.jazz && !signed.jazz) { signed.jazz = true; nm = STREET.jazz; }
