@@ -158,6 +158,8 @@
     part(0.04, SHELF_H, DEPTH, M.oak, width / 2, SHELF_H / 2, 0);
     part(width + 0.04, 0.04, DEPTH, M.oak, 0, SHELF_H, 0);
     part(width, 0.1, DEPTH - 0.02, M.black, 0, 0.05, 0);
+    part(width + 0.1, 0.035, DEPTH + 0.05, M.oak, 0, SHELF_H + 0.037, 0.01);   // 윗몰딩
+    part(width + 0.04, 0.03, 0.012, M.oak, 0, SHELF_H - 0.045, DEPTH / 2);       // 윗단 앞 가림
     ROW_Y.forEach(function (y, i) { if (i) part(width, 0.025, DEPTH, M.oak, 0, y - 0.0125, 0); });
     return { unit: unit, width: width, rows: ROW_Y.map(function (y) { return { y: y }; }) };
   }
@@ -317,23 +319,83 @@
     g.fillStyle = '#e9d27a'; for (var y = 0; y < h; y += 128) g.fillRect(w / 2 - 4, y, 8, 64);
     g.fillStyle = '#f2f2ee'; g.fillRect(8, 0, 6, h); g.fillRect(w - 14, 0, 6, h);
   }, [1, 20]);
-  var facadeTex = canvasTex(256, 512, function (g, w, h) {   // 건너편 건물 외벽 (창 격자)
-    var r = rnd(43); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
-    for (var y = 12; y < h - 8; y += 32) for (var x = 10; x < w - 10; x += 30) {
-      var lit = r();
-      g.fillStyle = lit < 0.12 ? '#f6e7b8' : lit < 0.55 ? '#7c8c9c' : '#93a5b6'; g.fillRect(x, y, 20, 20);
-      g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x, y, 20, 3);
+  // 건너편 건물 외벽: 한 장이 가로 4칸 × 세로 4층 (한 칸 3m × 3.2m). 건물마다 UV를 크기에 맞춰 되풀이해 창 크기가 늘 같다.
+  // 모양 둘: 0 = 사무실(넓은 띠창·어두운 창틀), 1 = 주거(창 둘·창턱·실외기). 같은 배치로 색·반사(G=거칠기,B=금속성)·밤 불빛·요철 그림을 그린다.
+  function drawFacade(g, w, h, style, mode) {
+    var C = w / 4, wallC = { color: '#ffffff', pbr: 'rgb(0,228,0)', night: '#000000', bump: '#808080' }[mode];
+    g.fillStyle = wallC; g.fillRect(0, 0, w, h);
+    var rr = rnd(43 + style * 7);
+    if (mode === 'color') {   // 벽 얼룩·줄눈
+      for (var n = 0; n < 2600; n++) { g.fillStyle = 'rgba(' + (rr() < 0.5 ? '0,0,0,' : '255,255,255,') + rr() * 0.05 + ')'; g.fillRect(rr() * w, rr() * h, 2 + rr() * 3, 1 + rr() * 2); }
+      g.fillStyle = 'rgba(0,0,0,0.05)';
+      if (style) for (var by = 0; by < h; by += 8) g.fillRect(0, by, w, 1);
+      else for (var px = 0; px < w; px += C / 2) g.fillRect(px, 0, 1, h);
     }
-  }, [1, 1]);
-  facadeTex.wrapS = facadeTex.wrapT = T.RepeatWrapping;
-  var facadePbrTex = canvasTex(256, 512, function (g, w, h) {   // 같은 창 격자: 창은 매끈한 유리(하늘이 비침), 벽은 거친 돌 (G=거칠기, B=금속성)
-    g.fillStyle = 'rgb(0,225,0)'; g.fillRect(0, 0, w, h);
-    for (var y = 12; y < h - 8; y += 32) for (var x = 10; x < w - 10; x += 30) {
-      g.fillStyle = 'rgb(0,150,40)'; g.fillRect(x - 1, y - 1, 22, 22);   // 창틀
-      g.fillStyle = 'rgb(0,16,255)'; g.fillRect(x, y, 20, 20);
+    if (mode === 'bump') { g.fillStyle = '#6c6c6c'; if (style) for (var by2 = 0; by2 < h; by2 += 8) g.fillRect(0, by2, w, 1); else for (var px2 = 0; px2 < w; px2 += C / 2) g.fillRect(px2, 0, 2, h); }
+    function rect(x, y, ww, hh, col) { g.fillStyle = col; g.fillRect(x, y, ww, hh); }
+    function win(x, y, ww, hh, seed, mull) {
+      var q = rnd(seed), lit = q(), blind = q(), tone = q(), warm = q();
+      var fr = style ? 4 : 3;
+      if (mode === 'color') {
+        rect(x - fr, y - fr, ww + fr * 2, hh + fr * 2, style ? '#f1efe9' : '#3b4048');
+        var gg = g.createLinearGradient(0, y, 0, y + hh); gg.addColorStop(0, tone < 0.5 ? '#8ea3b8' : '#7d93aa'); gg.addColorStop(1, tone < 0.5 ? '#5f7388' : '#52677d');
+        g.fillStyle = gg; g.fillRect(x, y, ww, hh);
+        g.fillStyle = 'rgba(255,255,255,0.16)'; g.beginPath(); g.moveTo(x, y + hh); g.lineTo(x + ww * 0.45, y); g.lineTo(x + ww * 0.62, y); g.lineTo(x + ww * 0.17, y + hh); g.fill();   // 유리 비침
+        if (blind < 0.45) rect(x, y, ww, hh * (0.2 + blind), style ? 'rgba(244,238,226,0.9)' : 'rgba(226,230,234,0.85)');   // 블라인드·커튼
+        if (lit < 0.1) rect(x, y, ww, hh, 'rgba(255,226,160,0.5)');
+        for (var m = 1; m < mull; m++) rect(x + ww * m / mull - 1, y, 2, hh, style ? '#f1efe9' : '#3b4048');
+        if (style) { rect(x, y + hh * 0.55, ww, 2, '#f1efe9'); rect(x - fr - 2, y + hh + fr, ww + fr * 2 + 4, 5, '#dcd8ce'); rect(x - fr, y + hh + fr + 5, ww + fr * 2, 14, 'rgba(0,0,0,0.07)'); }
+      } else if (mode === 'pbr') {
+        rect(x - fr, y - fr, ww + fr * 2, hh + fr * 2, style ? 'rgb(0,150,0)' : 'rgb(0,90,160)');
+        rect(x, y, ww, hh, 'rgb(0,14,255)');
+        if (blind < 0.45) rect(x, y, ww, hh * (0.2 + blind), 'rgb(0,70,150)');
+        for (var m2 = 1; m2 < mull; m2++) rect(x + ww * m2 / mull - 1, y, 2, hh, 'rgb(0,120,120)');
+        if (style) rect(x - fr - 2, y + hh + fr, ww + fr * 2 + 4, 5, 'rgb(0,170,0)');
+      } else if (mode === 'night') {
+        if (lit < 0.4) {
+          var col = warm < 0.7 ? '#ffd58a' : warm < 0.9 ? '#fff0c8' : '#bfd8ff';
+          rect(x, y, ww, hh, col);
+          if (blind < 0.45) rect(x, y, ww, hh * (0.2 + blind), 'rgba(0,0,0,0.35)');
+          rect(x, y + hh * 0.7, ww, hh * 0.3, 'rgba(0,0,0,0.18)');   // 방 안 가구 그림자
+          for (var m3 = 1; m3 < mull; m3++) rect(x + ww * m3 / mull - 1, y, 2, hh, '#000000');
+        }
+      } else {
+        rect(x - fr, y - fr, ww + fr * 2, hh + fr * 2, '#c4c4c4'); rect(x, y, ww, hh, '#3c3c3c');
+        for (var m4 = 1; m4 < mull; m4++) rect(x + ww * m4 / mull - 1, y, 2, hh, '#b0b0b0');
+        if (style) rect(x - fr - 2, y + hh + fr, ww + fr * 2 + 4, 5, '#e6e6e6');
+      }
     }
-  }, [1, 1]);
-  facadePbrTex.wrapS = facadePbrTex.wrapT = T.RepeatWrapping; facadePbrTex.encoding = T.LinearEncoding;
+    for (var fy = 0; fy < 4; fy++) for (var fx = 0; fx < 4; fx++) {
+      var x0 = fx * C, y0 = fy * C, sd = 1000 + style * 500 + fy * 17 + fx * 5;
+      if (style) {
+        win(x0 + C * 0.1, y0 + C * 0.2, C * 0.32, C * 0.52, sd, 2); win(x0 + C * 0.58, y0 + C * 0.2, C * 0.32, C * 0.52, sd + 91, 2);
+        if (rnd(sd + 7)() < 0.4) {   // 창 아래 실외기
+          var ax = x0 + C * 0.16, ay = y0 + C * 0.8;
+          if (mode === 'color') { rect(ax, ay, C * 0.2, C * 0.13, '#c9ccd0'); rect(ax + 3, ay + 3, C * 0.2 - 6, C * 0.13 - 6, '#8d9298'); }
+          else if (mode === 'pbr') rect(ax, ay, C * 0.2, C * 0.13, 'rgb(0,110,190)');
+          else if (mode === 'bump') rect(ax, ay, C * 0.2, C * 0.13, '#d8d8d8');
+        }
+      } else win(x0 + C * 0.07, y0 + C * 0.16, C * 0.86, C * 0.58, sd, 4);
+      if (mode === 'color') { rect(x0, y0, C, 2, 'rgba(0,0,0,0.16)'); rect(x0, y0 + 2, C, 3, 'rgba(255,255,255,0.3)'); }   // 층 사이 띠
+      else if (mode === 'bump') rect(x0, y0, C, 5, '#b8b8b8');
+    }
+  }
+  function facadeMap(style, mode) {
+    var t = canvasTex(512, 512, function (g, w, h) { drawFacade(g, w, h, style, mode); }, [1, 1]);
+    if (mode !== 'color' && mode !== 'night') t.encoding = T.LinearEncoding;
+    return t;
+  }
+  var FACADE_TEX = [0, 1].map(function (st) { return { color: facadeMap(st, 'color'), pbr: facadeMap(st, 'pbr'), night: facadeMap(st, 'night'), bump: facadeMap(st, 'bump') }; });
+  var FACADE_COLORS = [0xf3e2c7, 0xe9a48f, 0x9fd3c7, 0xf2c879, 0xe3c2b0, 0xb9d6e8];   // 따뜻한 파스텔 (크림·산호·민트·겨자·살구·하늘)
+  function bldGeo(bd, bh, bw) {   // 한 변 1짜리 상자 + 건물 크기에 맞춘 UV (가로는 3m마다 한 칸, 세로는 3.2m마다 한 층)
+    var gq = unitBox.clone(), uv = gq.attributes.uv; gq.userData = {};
+    for (var i = 0; i < uv.count; i++) {
+      var face = Math.floor(i / 4);
+      if (face === 2 || face === 3) { uv.setXY(i, 0.004, 0.004); continue; }   // 지붕·바닥은 벽 색만
+      uv.setXY(i, uv.getX(i) * Math.max(1, Math.round((face < 2 ? bw : bd) / 3)) / 4, uv.getY(i) * Math.max(1, Math.round(bh / 3.2)) / 4);
+    }
+    uv.needsUpdate = true; return gq;
+  }
   Object.assign(M, {
     pano: new T.MeshBasicMaterial({ side: T.BackSide, fog: false, depthWrite: false }),   // 깊이를 쓰지 않아 원통 너머의 큰 산·숲이 그 위에 그려진다   // 그림은 applyOutside()가 상태별로
     lightPool: new T.MeshBasicMaterial({ map: canvasTex(64, 64, function (g) { var gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,214,150,0.55)'); gr.addColorStop(1, 'rgba(255,214,150,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); }), transparent: true, depthWrite: false, opacity: 0 }),
@@ -344,7 +406,7 @@
     road: new T.MeshStandardMaterial({ map: roadTex, roughness: 0.9 }),
     trunk: new T.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 }),
     leaf: [0x5d8a4e, 0x6f9a55, 0x4f7a44, 0x83a862].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }); }),
-    facade: [0xf3e2c7, 0xe9a48f, 0x9fd3c7, 0xf2c879, 0xe3c2b0, 0xb9d6e8].map(function (c) { return new T.MeshStandardMaterial({ map: facadeTex, color: c, roughness: 1, metalness: 1, roughnessMap: facadePbrTex, metalnessMap: facadePbrTex }); }),
+    facade: [0, 1].reduce(function (acc, st) { return acc.concat(FACADE_COLORS.map(function (c) { var m = new T.MeshStandardMaterial({ map: FACADE_TEX[st].color, color: c, roughness: 1, metalness: 1, roughnessMap: FACADE_TEX[st].pbr, metalnessMap: FACADE_TEX[st].pbr, bumpMap: FACADE_TEX[st].bump, bumpScale: 0.06 }); m.userData.style = st; return m; })); }, []),
     shopGlass: new T.MeshStandardMaterial({ color: 0x2a3540, roughness: 0.1, metalness: 0.5, emissive: 0x000000, emissiveIntensity: 0.9 }),
     parapet: new T.MeshStandardMaterial({ color: 0xcdbfae, roughness: 0.8 }),
     awning: [0xd85c4a, 0x3d8f8a, 0xf0b93c, 0xf4efe6].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.8 }); }),
@@ -441,14 +503,6 @@
     panoCache[key] = t;
     return t;
   }
-  var facadeNightTex = canvasTex(256, 512, function (g, w, h) {   // 밤에 켜진 건물 창 (발광 그림)
-    var r = rnd(43); g.fillStyle = '#000000'; g.fillRect(0, 0, w, h);
-    for (var y = 12; y < h - 8; y += 32) for (var x = 10; x < w - 10; x += 30) {
-      var lit = r(); r();
-      if (lit < 0.42) { g.fillStyle = lit < 0.34 ? '#ffd58a' : '#bfd8ff'; g.fillRect(x, y, 20, 20); }
-    }
-  }, [1, 1]);
-  facadeNightTex.wrapS = facadeNightTex.wrapT = T.RepeatWrapping;
   // 비·눈 입자 (건물 바깥 양옆에만, 층마다 새로 만든다)
   var weatherFx = null;
   function addWeather(w, back, front, gy) {
@@ -510,10 +564,10 @@
     M.road.roughness = wet ? 0.25 : 0.9; tint(M.road, wet ? 0x8a8f96 : winter ? 0xe4e8ec : 0xffffff);
     M.pave.roughness = wet ? 0.35 : 0.95; tint(M.pave, winter ? 0xf2f4f6 : wet ? 0xb7b4ae : 0xffffff);
     tint(M.trunk, winter ? 0x5a4a3e : 0x6b4f3a); tint(M.pole, 0x3a3d42);
-    var FC = [0xf3e2c7, 0xe9a48f, 0x9fd3c7, 0xf2c879, 0xe3c2b0, 0xb9d6e8];   // 따뜻한 파스텔 (크림·산호·민트·겨자·살구·하늘) - three.js 예제 webgl_animation_keyframes의 거리 색감
+    var FC = FACADE_COLORS;
     M.facade.forEach(function (m, i) {
       tint(m, FC[i % FC.length]);
-      m.emissiveMap = (night || dusk) ? facadeNightTex : null; m.emissive.setHex((night || dusk) ? 0xffffff : 0x000000);
+      m.emissiveMap = (night || dusk) ? FACADE_TEX[m.userData.style].night : null; m.emissive.setHex((night || dusk) ? 0xffffff : 0x000000);
       m.emissiveIntensity = night ? 1 : 0.5; m.needsUpdate = true;
     });
     M.streetLight.emissive.setHex(night || dusk || grey ? 0xffe2a8 : 0x000000);
@@ -597,6 +651,9 @@
   var FURN = {
     sofa: [0x5b6b5e, 0x8a6f5a, 0x3f4a5a, 0xb9ab97].map(function (c) { return new T.MeshStandardMaterial({ color: c, map: fabricTex, roughness: 0.95 }); }),
     leather: new T.MeshStandardMaterial({ color: 0x7a4a2c, roughness: 0.45, metalness: 0.05 }),
+    seam: new T.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 }),
+    ceramic: new T.MeshStandardMaterial({ color: 0xe9e2d4, roughness: 0.35 }),
+    bulb: new T.MeshStandardMaterial({ color: 0xfff3d6, emissive: 0xffd9a0, emissiveIntensity: 1.2 }),
     rug: new T.MeshStandardMaterial({ map: rugTex, roughness: 1 }),
     walnut: new T.MeshStandardMaterial({ map: oakTex, color: 0x8a6a50, roughness: 0.45 }),
     brass: new T.MeshStandardMaterial({ color: 0xb8924a, roughness: 0.3, metalness: 0.9 }),
@@ -620,6 +677,15 @@
       part(g, new T.CylinderGeometry(0.025, 0.018, 0.12, 10), FURN.walnut, s * (W / 2 - 0.08), 0.06, t * 0.36);
     }); });
     if (seats > 1) part(g, rbox(0.42, 0.36, 0.12, 0.05), FURN.sofa[3], -W / 2 + 0.45, 0.62, -0.18, -0.25, 0.2);   // 쿠션
+    for (var b = 0; b < seats; b++) part(g, rbox(0.72, 0.4, 0.16, 0.07), mat, (b - (seats - 1) / 2) * 0.78, 0.66, -0.24, -0.2);   // 자리마다 등쿠션
+    part(g, rbox(W - 0.04, 0.05, 0.86, 0.02), FURN.walnut, 0, 0.1, 0);                               // 원목 받침 틀
+    for (var sb = 1; sb < seats; sb++) part(g, new T.BoxGeometry(0.012, 0.15, 0.7), FURN.seam, (sb - seats / 2) * 0.78, 0.4, 0.06);   // 방석 사이 골
+    [-1, 1].forEach(function (s2) { part(g, rbox(0.2, 0.05, 0.92, 0.025), mat, s2 * (W / 2 - 0.09), 0.645, 0); });   // 팔걸이 윗단
+    if (seats > 2) {   // 팔걸이에 걸친 담요 + 반대쪽 작은 쿠션
+      part(g, rbox(0.22, 0.03, 0.6, 0.012), FURN.sofa[1], W / 2 - 0.09, 0.685, 0.05);
+      part(g, rbox(0.03, 0.3, 0.6, 0.012), FURN.sofa[1], W / 2 + 0.012, 0.53, 0.05);
+      part(g, rbox(0.36, 0.3, 0.1, 0.05), FURN.leather, W / 2 - 0.5, 0.6, -0.16, -0.3, -0.25);
+    }
     return g;
   }
   function coffeeTable(x, z, ry) {
@@ -633,6 +699,19 @@
         -0.3, 0.465 + i * 0.036, 0, 0, r() * 0.4 - 0.2, 0);
     }
     part(g, new T.CylinderGeometry(0.045, 0.04, 0.1, 16), M.white, 0.32, 0.495, 0.08);
+    part(g, new T.CylinderGeometry(0.075, 0.075, 0.008, 20), M.white, 0.32, 0.449, 0.08);                 // 잔 받침
+    part(g, new T.TorusGeometry(0.03, 0.008, 6, 12), M.white, 0.372, 0.495, 0.08);                         // 잔 손잡이
+    part(g, new T.CylinderGeometry(0.036, 0.036, 0.004, 16), FURN.leather, 0.32, 0.546, 0.08);             // 커피
+    part(g, rbox(0.34, 0.02, 0.24, 0.008), M.black, 0.02, 0.455, -0.14);                                   // 쟁반
+    part(g, new T.CylinderGeometry(0.035, 0.05, 0.16, 14), FURN.ceramic, 0.0, 0.545, -0.14);               // 꽃병
+    for (var f = 0; f < 5; f++) {   // 꽃대와 꽃
+      var fa = f * 1.26, fh = 0.16 + r() * 0.1;
+      part(g, new T.CylinderGeometry(0.004, 0.004, fh, 5), FURN.leaves[1], Math.cos(fa) * 0.02, 0.625 + fh / 2, -0.14 + Math.sin(fa) * 0.02, Math.sin(fa) * 0.25, 0, -Math.cos(fa) * 0.25);
+      part(g, new T.SphereGeometry(0.022, 8, 6), new T.MeshStandardMaterial({ color: [0xe98a9c, 0xf2c14e, 0xf4f1ea, 0xd9668a, 0xf0a45d][f], roughness: 0.7 }), Math.cos(fa) * (0.02 + fh * 0.25), 0.625 + fh, -0.14 + Math.sin(fa) * (0.02 + fh * 0.25));
+    }
+    part(g, new T.BoxGeometry(0.21, 0.006, 0.28), M.white, 0.1, 0.139, 0.02, 0, 0.3, 0);                   // 아래 선반의 잡지
+    part(g, new T.BoxGeometry(0.21, 0.006, 0.28), new T.MeshStandardMaterial({ color: PALETTE[Math.floor(r() * PALETTE.length)], roughness: 0.5 }), 0.1, 0.146, 0.02, 0, 0.1, 0);
+    [-1, 1].forEach(function (s3) { part(g, new T.BoxGeometry(1.08, 0.02, 0.02), M.black, 0, 0.385, s3 * 0.26); });   // 상판 아래 보
     return g;
   }
   function floorLamp(x, z) {
@@ -640,6 +719,13 @@
     part(g, new T.CylinderGeometry(0.17, 0.19, 0.03, 24), M.black, 0, 0.015, 0);
     part(g, new T.CylinderGeometry(0.014, 0.014, 1.55, 8), FURN.brass, 0, 0.79, 0);
     part(g, new T.CylinderGeometry(0.17, 0.25, 0.3, 24, 1, true), FURN.shadeOn, 0, 1.66, 0).castShadow = false;
+    part(g, new T.TorusGeometry(0.17, 0.006, 6, 24), FURN.brass, 0, 1.81, 0, Math.PI / 2);                 // 갓 위·아래 테
+    part(g, new T.TorusGeometry(0.25, 0.006, 6, 24), FURN.brass, 0, 1.51, 0, Math.PI / 2);
+    part(g, new T.SphereGeometry(0.05, 12, 8), FURN.bulb, 0, 1.62, 0).castShadow = false;                  // 전구
+    part(g, new T.CylinderGeometry(0.022, 0.022, 0.08, 10), FURN.brass, 0, 1.55, 0);                       // 소켓
+    part(g, new T.CylinderGeometry(0.002, 0.002, 0.22, 4), FURN.brass, 0.06, 1.44, 0);                     // 당김줄
+    part(g, new T.SphereGeometry(0.01, 6, 5), FURN.brass, 0.06, 1.33, 0);
+    part(g, new T.CylinderGeometry(0.03, 0.03, 0.06, 12), FURN.brass, 0, 0.06, 0);                         // 받침 목
     return g;
   }
   function rug(x, z, w, d, ry) {
@@ -778,27 +864,41 @@
     [-0.6, 0.6].forEach(function (x) { p(G.lamp, CAR.head, x, 0.7, 2.15); p(G.lamp, CAR.tail, x, 0.72, -2.15); });
     return g;
   }
+  function loopOf(w, back, front) {   // 순환 도로: 양옆 길을 서재 뒤(z0)와 캠핑장 뒤(z1)에서 잇는다
+    var cz = (front + back) / 2, rz1 = front + PLAZA_D + RIVER_GAP + RIVER_W;
+    return { hx: w / 2 + 9, z0: back - 26, z1: Math.min(rz1 + CAMP_D, cz + SCENE_R - 22) + 5 };
+  }
+  function loopAt(L, off, s) {   // 차선(off: 바깥 +, 안 -)을 따라 s만큼 간 자리와 방향. 오른쪽 길은 +z, 앞길은 -x, 왼쪽 길은 -z, 뒷길은 +x
+    var rad = 4.5 + off, hx = L.hx + off, za = L.z0 - off, zb = L.z1 + off;
+    var sz = zb - za - 2 * rad, sx = 2 * hx - 2 * rad, arc = Math.PI / 2 * rad, per = 2 * sz + 2 * sx + 4 * arc;
+    s = ((s % per) + per) % per;
+    function corner(cx, cz0, a0, t) { var a = a0 + t / rad; return [cx + Math.cos(a) * rad, cz0 + Math.sin(a) * rad, Math.atan2(-Math.sin(a), Math.cos(a))]; }
+    if (s < sz) return [hx, za + rad + s, 0, 1, per];
+    s -= sz; if (s < arc) return corner(hx - rad, zb - rad, 0, s).concat([0, per]);
+    s -= arc; if (s < sx) return [hx - rad - s, zb, -Math.PI / 2, 0, per];
+    s -= sx; if (s < arc) return corner(-hx + rad, zb - rad, Math.PI / 2, s).concat([0, per]);
+    s -= arc; if (s < sz) return [-hx, zb - rad - s, Math.PI, -1, per];
+    s -= sz; if (s < arc) return corner(-hx + rad, za + rad, Math.PI, s).concat([0, per]);
+    s -= arc; if (s < sx) return [-hx + rad + s, za, Math.PI / 2, 0, per];
+    s -= sx; return corner(hx - rad, za + rad, -Math.PI / 2, s).concat([0, per]);
+  }
   function addCars(w, back, front, gy) {
     cars = [];
-    var r = rnd(83), span = { z0: back - 60, z1: front + 60 };
-    [-1, 1].forEach(function (side) {
-      var roadX = side * (w / 2 + 9);
-      [-1, 1].forEach(function (dir) {   // 차선 둘 (반대 방향)
-        var laneX = roadX + dir * 1.9, n = useReal('car') ? 2 : 3 + Math.floor(r() * 2);   // 모형 차는 무거워 차선마다 2대
-        for (var i = 0; i < n; i++) {
-          var c = makeCar(r); c.position.set(laneX, gy, span.z0 + r() * (span.z1 - span.z0)); c.rotation.y = dir > 0 ? 0 : Math.PI;
-          parent.add(c);
-          cars.push({ g: c, dir: dir, speed: 7 + r() * 6, span: span });
-        }
-      });
+    var r = rnd(83), L = loopOf(w, back, front);
+    [1.9, -1.9].forEach(function (off) {   // 차선 둘: 바깥 차선과 안 차선이 서로 반대로 돈다
+      var per = loopAt(L, off, 0)[4], n = useReal('car') ? 4 : 8 + Math.floor(r() * 3), speed = 8 + r() * 2;   // 같은 차선은 같은 빠르기 (앞차를 뚫지 않게)
+      for (var i = 0; i < n; i++) {
+        var c = makeCar(r); parent.add(c);
+        cars.push({ g: c, L: L, off: off, rev: off < 0, s: (i + r() * 0.5) / n * per, speed: speed, gy: gy });
+      }
     });
+    updateCars(0);
   }
   function updateCars(dt) {
     for (var i = 0; i < cars.length; i++) {
-      var c = cars[i], z = c.g.position.z + c.dir * c.speed * dt;
-      if (carHold(c, z)) continue;
-      if (z > c.span.z1) z = c.span.z0; else if (z < c.span.z0) z = c.span.z1;
-      c.g.position.z = z;
+      var c = cars[i], ns = c.s + (c.rev ? -1 : 1) * c.speed * dt, q = loopAt(c.L, c.off, ns), dz = q[3] * (c.rev ? -1 : 1);
+      if (dt && dz && carHold({ g: c.g, dir: dz }, q[1])) continue;   // 횡단보도에 사람이 있으면 선다
+      c.s = ns; c.g.position.set(q[0], c.gy, q[1]); c.g.rotation.y = q[2] + (c.rev ? Math.PI : 0);
     }
   }
   // 현수막 건물([거리] 설정의 현수막 건물): 설정에 그림 주소가 있으면 간판 아래 벽에 건다 (그림은 서버가 받아 둔 것을 쓴다)
@@ -870,14 +970,15 @@
     var pano = new T.Mesh(new T.CylinderGeometry(SCENE_R, SCENE_R, 110, 64, 1, true), M.pano);
     add(pano, 0, EYE - 110 * 0.3 + 110 / 2, cz);   // 그림의 지평선(아래에서 30%)을 눈높이에 맞춘다
     pano.rotation.y = floorIdx * 1.3; pano.renderOrder = -10;
-    var len = d + 120;
+    var LP = loopOf(w, back, front), len = LP.z1 - LP.z0 + 8, lcz = (LP.z0 + LP.z1) / 2;   // 길은 순환 도로 끝까지만
+    var r2 = rnd(977 + floorIdx), Lp = [], Lm = [], La = [];   // 건물 장식(난간 돌·어두운 쇠·밝은 설비) - 한꺼번에 그린다
     var signed = { gallery: false, jazz: false, office: false, next: 0 };
     BANNER_B = null; bannerMesh = null; SHOPS = {};
     [1, -1].forEach(function (side) {
       var walkX = side * (w / 2 + 2.5), roadX = side * (w / 2 + 9), farWalkX = side * (w / 2 + 15.5);
-      var walk = new T.Mesh(new T.PlaneGeometry(5, len), M.pave); walk.rotation.x = -Math.PI / 2; add(walk, walkX, gy + 0.02, cz);
-      var road = new T.Mesh(new T.PlaneGeometry(8, len), M.road); road.rotation.x = -Math.PI / 2; add(road, roadX, gy + 0.01, cz);
-      var walk2 = new T.Mesh(new T.PlaneGeometry(5, len), M.pave); walk2.rotation.x = -Math.PI / 2; add(walk2, farWalkX, gy + 0.02, cz);
+      var walk = new T.Mesh(new T.PlaneGeometry(5, len), M.pave); walk.rotation.x = -Math.PI / 2; add(walk, walkX, gy + 0.02, lcz);
+      var road = new T.Mesh(new T.PlaneGeometry(8, len), M.road); road.rotation.x = -Math.PI / 2; add(road, roadX, gy + 0.01, lcz);
+      var walk2 = new T.Mesh(new T.PlaneGeometry(5, len), M.pave); walk2.rotation.x = -Math.PI / 2; add(walk2, farWalkX, gy + 0.02, lcz);
       for (var tz = back - 40; tz < front + 40; tz += 7 + r() * 3) {   // 가로수 (양쪽 보도)
         if (tz > rz0 - 2.5 && tz < rz1 + 2.5) continue;   // 다리 위에는 심지 않는다
         [walkX + side * 1.4, farWalkX - side * 1.4].forEach(function (tx) {
@@ -901,7 +1002,7 @@
         var bw = 10 + r() * 14, bd = 10 + r() * 10, bh = 9 + Math.pow(r(), 1.6) * 34;
         var mat = M.facade[Math.floor(r() * M.facade.length)];
         if (bz + bw > rz0 - 1) break;   // 건물은 강가까지만 (강 건너는 숲과 캠핑장)
-        var bld = new T.Mesh(unitBox, mat); bld.scale.set(bd, bh, bw);
+        var bld = new T.Mesh(bldGeo(bd, bh, bw), mat); bld.scale.set(bd, bh, bw);
         var bx = side * (w / 2 + 18 + bd / 2 + r() * 6);
         add(bld, bx, gy + bh / 2, bz + bw / 2);
         var shop = new T.Mesh(unitBox, M.shopGlass); shop.scale.set(bd + 0.2, 3.4, bw + 0.2); add(shop, bx, gy + 1.7, bz + bw / 2);   // 1층 상점 유리
@@ -926,9 +1027,44 @@
           sign.rotation.y = -side * Math.PI / 2; add(sign, sx, sy, mid);   // 서재 쪽을 보게
           var sbk = new T.Mesh(unitBox, M.pole); sbk.scale.set(0.15, sh + 0.25, sw + 0.25); add(sbk, bx - side * (bd / 2 + 0.05), sy, mid);
         }
+        (function (bx, bd, bw, bh, mid, nm, style) {   // 세밀한 장식: 띠 장식·처마·모서리 기둥·가게 창살과 문·발코니·옥상 설비·홈통
+          var face = bx - side * bd / 2, y0 = gy, room = nm && [STREET.gallery, STREET.jazz, STREET.office].indexOf(nm) >= 0;
+          Lp.push([bx, y0 + 3.62, mid, bd + 0.3, 0.2, bw + 0.3], [bx, y0 + bh - 0.2, mid, bd + 0.55, 0.28, bw + 0.55], [bx, y0 + bh + 0.85, mid, bd + 0.3, 0.1, bw + 0.3]);
+          [-1, 1].forEach(function (cx) { [-1, 1].forEach(function (cz2) { Lp.push([bx + cx * (bd / 2 - 0.12), y0 + 3.7 + (bh - 3.9) / 2, mid + cz2 * (bw / 2 - 0.12), 0.42, bh - 3.9, 0.42]); }); });
+          for (var fy = 2; fy * 3.2 < bh - 2; fy += style ? 1 : 2) Lp.push([bx, y0 + fy * 3.2 * (bh / (Math.max(1, Math.round(bh / 3.2)) * 3.2)), mid, bd + 0.14, 0.09, bw + 0.14]);   // 층 띠
+          Lm.push([face - side * 0.3, y0 + bh / 2, mid + bw / 2 - 0.5, 0.1, bh, 0.1]);   // 홈통
+          if (!room) {   // 1층 가게 앞: 창살·아래턱·문
+            for (var mz = -bw / 2 + 0.3; mz <= bw / 2 - 0.29; mz += (bw - 0.6) / Math.max(2, Math.round(bw / 2.4))) Lm.push([face - side * 0.14, y0 + 1.75, mid + mz, 0.09, 3.3, 0.09]);
+            Lm.push([face - side * 0.14, y0 + 3.35, mid, 0.1, 0.12, bw], [face - side * 0.16, y0 + 0.2, mid, 0.14, 0.4, bw]);
+            var dz0 = (r2() - 0.5) * bw * 0.4;
+            Lm.push([face - side * 0.2, y0 + 1.25, mid + dz0, 0.1, 2.5, 1.3]); La.push([face - side * 0.27, y0 + 1.1, mid + dz0 + 0.45, 0.04, 0.4, 0.05]);
+          }
+          if (style && bh > 12) {   // 주거 건물: 길 쪽 발코니 한두 줄
+            var cols = bw > 16 ? [-bw * 0.25, bw * 0.25] : [0];
+            cols.forEach(function (cz3) { for (var by = 2; by * 3.2 < bh - 3; by++) {
+              var yy = y0 + by * 3.2 * (bh / (Math.max(1, Math.round(bh / 3.2)) * 3.2)) + 0.15;
+              Lp.push([face - side * 0.5, yy, mid + cz3, 1.0, 0.1, 2.6]);
+              Lm.push([face - side * 0.98, yy + 0.95, mid + cz3, 0.05, 0.05, 2.6], [face - side * 0.98, yy + 0.5, mid + cz3, 0.03, 0.9, 2.56]);
+            } });
+          }
+          var na = 1 + Math.floor(r2() * 3);   // 옥상: 실외기·환기구·안테나
+          for (var ai = 0; ai < na; ai++) {
+            var ax = bx + (r2() - 0.5) * bd * 0.6, az = mid + (r2() - 0.5) * bw * 0.6;
+            La.push([ax, y0 + bh + 0.9, az, 1.3, 0.8, 0.9]); Lm.push([ax, y0 + bh + 1.32, az, 0.9, 0.04, 0.6]);
+          }
+          if (r2() < 0.6) Lm.push([bx + (r2() - 0.5) * bd * 0.5, y0 + bh + 2.4, mid + (r2() - 0.5) * bw * 0.5, 0.06, 3.8, 0.06]);
+          if (r2() < 0.45) { var tk = new T.Mesh(tankGeo, CAMP.cooler); tk.scale.set(1.1, 1.7, 1.1); add(tk, bx + bd * 0.25, y0 + bh + 1.6, mid - bw * 0.25);
+            Lm.push([bx + bd * 0.25, y0 + bh + 0.6, mid - bw * 0.25, 1.6, 0.12, 1.6]); }
+        })(bx, bd, bw, bh, bz + bw / 2, nm, mat.userData.style);
         if (r() < 0.5) { var hut = new T.Mesh(unitBox, M.parapet); hut.scale.set(bd * 0.3, 2.2, bw * 0.25); add(hut, bx + (r() - 0.5) * bd * 0.4, gy + bh + 1.1, bz + bw / 2 + (r() - 0.5) * bw * 0.4); }
         bz += bw + 2 + r() * 6;
       }
+    });
+    instBoxes(Lp, M.parapet); instBoxes(Lm, M.pole); instBoxes(La, CAMP.cooler);
+    // 순환 도로의 앞길(캠핑장 뒤)·뒷길(서재 뒤) + 모퉁이
+    [LP.z0, LP.z1].forEach(function (rz) {
+      var cr = new T.Mesh(new T.PlaneGeometry(8, 2 * LP.hx + 8), M.road); cr.rotation.set(-Math.PI / 2, 0, Math.PI / 2); add(cr, 0, gy + 0.024, rz);   // 양옆 보도보다 살짝 위 (찻길이 보도에 덮이지 않게)
+      [-1, 1].forEach(function (sd) { var wk = new T.Mesh(new T.PlaneGeometry(2.4, 2 * LP.hx + 18), M.pave); wk.rotation.set(-Math.PI / 2, 0, Math.PI / 2); add(wk, 0, gy + 0.022, rz + sd * 5.2); });
     });
     addRiverCamp(w, back, front, gy, floorIdx);
     addWeather(w, back, front, gy);
@@ -996,7 +1132,8 @@
   Object.keys(CAMP).forEach(function (k) { [].concat(CAMP[k]).forEach(function (m) { m.userData.keep = true; m.userData.envSet = true; }); });
   var domeGeo = new T.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), tipiGeo = new T.ConeGeometry(1, 1, 6, 1, true), pineGeo = new T.ConeGeometry(1, 1, 7),
       rockGeo = new T.IcosahedronGeometry(1, 0), bulbGeo = new T.SphereGeometry(1, 8, 6), flameGeo = new T.ConeGeometry(0.22, 0.7, 6);
-  [domeGeo, tipiGeo, pineGeo, rockGeo, bulbGeo, flameGeo].forEach(function (gq) { gq.userData.shared = true; });
+  var tankGeo = new T.CylinderGeometry(1, 1, 1, 14);
+  [domeGeo, tipiGeo, pineGeo, rockGeo, bulbGeo, flameGeo, tankGeo].forEach(function (gq) { gq.userData.shared = true; });
   function campTint(o, f, envOut) {   // applyOutside에서: 시간·계절·날씨에 맞춰 강·캠핑장 색과 불빛
     var night = o.time === 'night', dusk = o.time === 'dusk', grey = o.weather !== 'clear', winter = o.season === 'winter', lit = night || dusk || grey;
     function tint(m, hex) { m.color.setHex(hex).multiplyScalar(f); }
@@ -1060,7 +1197,7 @@
       ubox(0.3 * s, 1.2 * s, 0.3 * s, M.trunk, x, gy + 0.6 * s, z);
       for (var k = 0; k < 3; k++) { var c = new T.Mesh(pineGeo, CAMP.pine[Math.floor(r() * 3)]); c.scale.set((1.5 - k * 0.38) * s, 1.9 * s, (1.5 - k * 0.38) * s); c.rotation.y = r() * 6; add(c, x, gy + (1.8 + k * 1.15) * s, z); }
     }
-    for (var fx = -SCENE_R + 10; fx < SCENE_R - 10; fx += 3.2 + r() * 2.5) pine(fx, campZ1 + 3 + r() * 12, 1.3 + r() * 1.5);
+    for (var fx = -SCENE_R + 10; fx < SCENE_R - 10; fx += 3.2 + r() * 2.5) pine(fx, campZ1 + 13 + r() * 10, 1.3 + r() * 1.5);
     [1, -1].forEach(function (side) {   // 강 건너 길 바깥쪽도 숲
       for (var tz = z1 + 3; tz < campZ1 + 4; tz += 3.5 + r() * 2.5) for (var k = 0; k < 2; k++) pine(side * (w / 2 + 21 + k * 6 + r() * 5), tz + r() * 2, 1.2 + r() * 1.2);
     });
@@ -1720,14 +1857,26 @@
       addSeat(p0.x, p0.z, s * Math.PI / 2, 0.48);
     });
     // 회의 탁자 + 의자 여덟 (디스코드에서 온 출판사 사람들이 앉는 자리)
-    boxAt(wood, 1.1, 0.06, 3.4, P(5.3, 0, 0.74));
-    [3.9, 6.7].forEach(function (d0) { boxAt(dark, 0.9, 0.7, 0.08, P(d0, 0, 0.36)); });
+    boxAt(wood, 1.1, 0.05, 3.4, P(5.3, 0, 0.745));
+    boxAt(dark, 1.0, 0.04, 3.3, P(5.3, 0, 0.70));                                                       // 상판 아래 틀
+    [3.85, 6.75].forEach(function (d0) { [-0.42, 0.42].forEach(function (lat) { boxAt(dark, 0.07, 0.7, 0.07, P(d0, lat, 0.35)); }); boxAt(dark, 0.86, 0.05, 0.05, P(d0, 0, 0.12)); });
+    var paper = new T.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.9 }), screenM = new T.MeshBasicMaterial({ color: 0x9fc4e8, toneMapped: false });
+    [[4.3, 0.3], [5.1, -0.3], [5.9, 0.3], [6.4, -0.3]].forEach(function (q, qi) {                      // 노트북·원고·컵
+      boxAt(dark, 0.24, 0.015, 0.34, P(q[0], q[1], 0.78));
+      var lid = boxAt(dark, 0.015, 0.22, 0.34, P(q[0], q[1] + (q[1] > 0 ? -0.13 : 0.13), 0.89)); lid.rotation.y = 0; lid.scale.set(0.34, 0.22, 0.015); lid.rotation.x = (q[1] > 0 ? 1 : -1) * 0.2;
+      var sc = new T.Mesh(new T.PlaneGeometry(0.31, 0.19), screenM); sc.position.copy(P(q[0], q[1] + (q[1] > 0 ? -0.121 : 0.121), 0.89)); sc.rotation.y = q[1] > 0 ? 0 : Math.PI; sc.rotation.x = (q[1] > 0 ? 1 : -1) * 0.2; parent.add(sc);
+      boxAt(paper, 0.3, 0.012, 0.21, P(q[0] + 0.38, q[1] * 0.8, 0.778)).rotation.y = R.inRot + qi * 0.4;
+      var cup = new T.Mesh(new T.CylinderGeometry(0.035, 0.03, 0.09, 12), FURN.ceramic); cup.position.copy(P(q[0] - 0.3, q[1] * 0.6, 0.815)); parent.add(cup);
+    });
+    var vase = new T.Mesh(new T.CylinderGeometry(0.05, 0.07, 0.2, 14), FURN.ceramic); vase.position.copy(P(5.3, 0, 0.87)); parent.add(vase);
     OFFICE.seats = []; OFFICE.door = { x: R.fx + s * 1.0, z: z, rot: R.inRot };
+    var armGeoC = rbox(0.05, 0.03, 0.34, 0.012), seatGeoC = rbox(0.5, 0.08, 0.5, 0.03), backGeoC = rbox(0.48, 0.5, 0.06, 0.03), spokeGeo = new T.BoxGeometry(0.04, 0.03, 0.3), casterGeo = new T.SphereGeometry(0.03, 8, 6);
     [1, -1].forEach(function (sd) { [4.1, 4.9, 5.7, 6.5].forEach(function (d0) {
       var p1 = P(d0, sd * 0.95, 0), g1 = new T.Group(), rot = sd > 0 ? Math.PI : 0; g1.position.copy(p1); g1.rotation.y = rot; parent.add(g1);
-      var s1 = new T.Mesh(unitBox, dark); s1.scale.set(0.5, 0.08, 0.5); s1.position.y = 0.47; g1.add(s1);
-      var b1 = new T.Mesh(unitBox, dark); b1.scale.set(0.5, 0.55, 0.06); b1.position.set(0, 0.8, -0.24); g1.add(b1);
-      var l1 = new T.Mesh(unitBox, M.pole); l1.scale.set(0.06, 0.44, 0.06); l1.position.y = 0.22; g1.add(l1);
+      part(g1, seatGeoC, dark, 0, 0.47, 0); part(g1, backGeoC, dark, 0, 0.82, -0.24, -0.1);
+      part(g1, new T.CylinderGeometry(0.025, 0.025, 0.3, 8), M.pole, 0, 0.28, 0); part(g1, new T.BoxGeometry(0.04, 0.2, 0.04), M.pole, 0, 0.55, -0.25);
+      [-1, 1].forEach(function (a) { part(g1, armGeoC, dark, a * 0.27, 0.68, 0.0); part(g1, new T.BoxGeometry(0.03, 0.2, 0.03), M.pole, a * 0.27, 0.57, 0.1); });
+      for (var k5 = 0; k5 < 5; k5++) { var an = k5 * Math.PI * 2 / 5; part(g1, spokeGeo, M.pole, Math.sin(an) * 0.15, 0.1, Math.cos(an) * 0.15, 0, an, 0); part(g1, casterGeo, dark, Math.sin(an) * 0.3, 0.035, Math.cos(an) * 0.3); }
       OFFICE.seats.push({ x: p1.x, z: p1.z, rot: rot });
     }); });
     // 책장 (옆 벽) + 소파·탁자 (앞쪽) + 화분
