@@ -3230,7 +3230,7 @@
       .then(function (d) { if (!d.success) throw new Error(d.error || '저장 실패'); setBox.classList.remove('on'); cur = 0; build(true); })
       .catch(function (e) { el('l3d-set-msg').textContent = e.message; });
   }
-  el('l3d-set-btn').addEventListener('click', openSettings);
+  el('l3d-set-btn').addEventListener('click', function () { if (cfgBox.classList.contains('on')) cfgClose(); else cfgGo(0); });
   el('l3d-set-save').addEventListener('click', function () { saveSettings(false); });
   el('l3d-set-all').addEventListener('click', function () { saveSettings(true); });
   el('l3d-set-close').addEventListener('click', function () { setBox.classList.remove('on'); });
@@ -3279,7 +3279,6 @@
       el('l3d-ai-msg').textContent = (d.fixed || []).length ? '환경변수로 정해진 항목은 바꿀 수 없습니다: ' + d.fixed.join(', ') : '';
     }).catch(function (e) { el('l3d-ai-msg').textContent = e.message; });
   }
-  el('l3d-set-ai').addEventListener('click', openAI);
   el('l3d-ai-close').addEventListener('click', function () { aiBox.classList.remove('on'); });
   el('l3d-ai-save').addEventListener('click', function () {
     var body = { provider: el('l3d-ai-provider').value, base_url: el('l3d-ai-base').value, model: el('l3d-ai-model').value, chat: el('l3d-ai-chat').checked, chat_sec: +el('l3d-ai-sec').value || 60,
@@ -3381,7 +3380,6 @@
       el('l3d-ppl-msg').textContent = '저장했습니다. 지금 층에 바로 반영했습니다.';
     }).catch(function (e) { el('l3d-ppl-msg').textContent = e.message; });
   }
-  el('l3d-set-ppl').addEventListener('click', openPeople);
   el('l3d-ppl-save').addEventListener('click', function () { savePeople(false); });
   el('l3d-ppl-auto').addEventListener('click', function () { savePeople(true); });
   el('l3d-ppl-close').addEventListener('click', function () { pplBox.classList.remove('on'); });
@@ -3451,7 +3449,6 @@
           : BANNER.mode === 'url' ? '저장했습니다. 창밖 ' + (STREET.banner || '현수막') + ' 건물에 걸었습니다.' : '현수막을 내렸습니다.';
       }).catch(function (e) { el('l3d-out-msg').textContent = e.message; });
   });
-  el('l3d-set-out').addEventListener('click', openOutside);
   // 3D 모형: 지금 그대로(코드로 그린 가구) | 모형 파일
   var mdlBox = el('l3d-mdl');
   function openModels() {
@@ -3459,7 +3456,6 @@
     Array.prototype.forEach.call(mdlBox.querySelectorAll('input[name=l3d-mdl]'), function (i) { i.checked = i.value === MODELS; });
     el('l3d-mdl-msg').textContent = '';
   }
-  el('l3d-set-mdl').addEventListener('click', openModels);
   el('l3d-mdl-close').addEventListener('click', function () { mdlBox.classList.remove('on'); });
   el('l3d-mdl-save').addEventListener('click', function () {
     var v = (mdlBox.querySelector('input[name=l3d-mdl]:checked') || {}).value || 'basic';
@@ -3479,53 +3475,97 @@
     if (attrs && attrs.type === 'checkbox') e.checked = !!val; else e.value = val == null ? '' : val;
     return e;
   }
+  // 탭 안의 하위 탭: [data-sub] 묶음마다 버튼 하나, 고른 묶음만 보인다 (다시 그려도 고른 하위 탭은 그대로)
+  function subTabs(box, order) {
+    if (!box) return;
+    var old = box.querySelector(':scope > .l3d-sub-tabs'); if (old) old.remove();
+    var items = Array.prototype.slice.call(box.querySelectorAll(':scope > [data-sub]'));
+    var names = [];
+    items.forEach(function (x) { if (names.indexOf(x.dataset.sub) < 0) names.push(x.dataset.sub); });
+    if (order) names.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    if (names.length < 2) return;
+    var bar = document.createElement('div'); bar.className = 'l3d-sub-tabs'; bar.setAttribute('role', 'tablist');
+    var pick = names.indexOf(box.dataset.sub) >= 0 ? box.dataset.sub : names[0];
+    function show(name) {
+      box.dataset.sub = name;
+      items.forEach(function (x) { x.hidden = x.dataset.sub !== name; });
+      Array.prototype.forEach.call(bar.children, function (b) { b.classList.toggle('on', b.textContent === name); });
+      box.scrollTop = 0;
+    }
+    names.forEach(function (n) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = n;
+      b.addEventListener('click', function () { show(n); });
+      bar.appendChild(b);
+    });
+    box.insertBefore(bar, box.firstChild);
+    show(pick);
+  }
   function labeled(text, input) { var l = document.createElement('label'); l.className = input.type === 'checkbox' ? 'c' : 'f'; if (input.type === 'checkbox') { l.appendChild(input); l.appendChild(document.createTextNode(' ' + text)); } else { l.appendChild(document.createTextNode(text)); l.appendChild(input); } return l; }
   function drawStaff(d) {
     STAFF_CFG = d.config;
     var body = el('l3d-staff-body'); body.textContent = '';
-    var info = document.createElement('p'); info.className = 'sub';
-    info.textContent = (d.configured ? '' : '⚠ AI 설정(연결 방식·주소·모델)을 먼저 해야 직원이 일합니다. ') +
-      '오늘 AI 호출 ' + d.budget.used + ' / ' + (d.budget.limit || '무제한') + '회 (AI 설정에서 한도 변경).';
-    body.appendChild(info);
-    var auto = staffInput('input', d.config.autonomous, { type: 'checkbox', 'data-k': 'autonomous' });
-    body.appendChild(labeled('자율 업무 - 이용자가 없어도 직원은 정해진 주기로 혼자 일하고, AI 손님도 찾아옴', auto));
-    var dl = d.config.delivery || {}, dfs = document.createElement('fieldset'); dfs.dataset.delivery = '1';
-    var dlg = document.createElement('legend'); dlg.textContent = '배달 (책·영상·웹툰이 들어오면 배달원이 1층 안내 데스크로)'; dfs.appendChild(dlg);
+    function section(sub, cls) { var sc = document.createElement('section'); sc.dataset.sub = sub; if (cls) sc.className = cls; body.appendChild(sc); return sc; }
+    function h4(box, text) { var h = document.createElement('h4'); h.className = 'st-h'; h.textContent = text; box.appendChild(h); }
+    function note(box, text) { var pn = document.createElement('p'); pn.className = 'sub'; pn.textContent = text; box.appendChild(pn); }
+    // ── 기본·배달 ──
+    var base = section('기본·배달', 'card');
+    note(base, (d.configured ? '' : '⚠ AI 설정(연결 방식·주소·모델)을 먼저 해야 직원이 일합니다. ') +
+      '오늘 AI 호출 ' + d.budget.used + ' / ' + (d.budget.limit || '무제한') + '회 (AI 설정 > 기능에서 한도 변경).');
+    base.appendChild(labeled('자율 업무 - 이용자가 없어도 직원은 정해진 주기로 혼자 일하고, AI 손님도 찾아옴',
+      staffInput('input', d.config.autonomous, { type: 'checkbox', 'data-k': 'autonomous' })));
+    var dl = d.config.delivery || {}, dfs = section('기본·배달', 'card'); dfs.dataset.delivery = '1';
+    h4(dfs, '배달 - 책·영상·웹툰이 들어오면 배달원이 1층 안내 데스크로');
     dfs.appendChild(labeled('배달 받기', staffInput('input', dl.enabled !== false, { type: 'checkbox', 'data-d': 'enabled' })));
     dfs.appendChild(labeled('웹툰 다운로더(BookOasis Assistant)가 보낸 회차도 (잠잠해질 때까지 모아 한 상자로)', staffInput('input', dl.webtoon !== false, { type: 'checkbox', 'data-d': 'webtoon' })));
     dfs.appendChild(labeled('배달원 이름 (바깥 프로그램이 이름을 보내면 그 이름)', staffInput('input', dl.name || '배달원', { type: 'text', 'data-d': 'name' })));
-    var dsub = document.createElement('p'); dsub.className = 'sub';
-    dsub.textContent = (d.events_on ? '바깥 프로그램 알림 켜짐: POST /api/lib3d/events (Authorization: Bearer LIB3D_EVENT_TOKEN).' : '바깥 프로그램(디스코드 봇 등)에서 보내려면 .env에 LIB3D_EVENT_TOKEN을 넣으세요.') +
-      ' 최근: ' + ((d.deliveries || []).slice(0, 3).map(function (x) { return new Date(x.t * 1000).toLocaleString() + ' ' + (x.from || (x.src === 'webtoon' ? '웹툰 다운로더' : '')) + ' - ' + x.text; }).join(' / ') || '없음');
-    dfs.appendChild(dsub);
-    body.appendChild(dfs);
-    var gh = false;
+    note(dfs, d.events_on ? '바깥 프로그램 알림 켜짐: POST /api/lib3d/events (Authorization: Bearer LIB3D_EVENT_TOKEN).' : '바깥 프로그램(디스코드 봇 등)에서 보내려면 .env에 LIB3D_EVENT_TOKEN을 넣으세요.');
+    var recent = (d.deliveries || []).slice(0, 5);
+    if (recent.length) {
+      var rl = document.createElement('div'); rl.className = 'logs';
+      recent.forEach(function (x) { var r = document.createElement('div'); r.textContent = new Date(x.t * 1000).toLocaleString() + ' · ' + (x.from || (x.src === 'webtoon' ? '웹툰 다운로더' : '배달원')) + ' · ' + x.text; rl.appendChild(r); });
+      h4(dfs, '최근 배달'); dfs.appendChild(rl);
+    }
+    // ── 사람마다 접고 펴는 카드 (서재 직원 / 길 건너 / AI 손님) ──
+    var STREET_POST = { office: 1, gallery: 1, jazz: 1 }, firstOf = {};
+    var guestSec = null;
     d.config.agents.forEach(function (a) {
       var guest = a.kind === 'guest';
-      if (guest && !gh) {
-        gh = true;
-        var h = document.createElement('h4'); h.textContent = 'AI 손님'; body.appendChild(h);
-        var gp = document.createElement('p'); gp.className = 'sub';
-        gp.textContent = '정해진 주기마다 입구로 들어와 구역을 둘러보고, 직원에게 묻고, 책을 살펴본 뒤 나갑니다 (손님과 직원의 대화는 그 층 채팅에 공개). ' +
-          '오늘 호출을 한도의 70% 넘게 썼으면 손님은 오지 않습니다.';
-        body.appendChild(gp);
+      var sub = guest ? 'AI 손님' : STREET_POST[a.post] ? '길 건너' : '서재 직원';
+      if (guest && !guestSec) {
+        guestSec = section('AI 손님');
+        note(guestSec, '정해진 주기마다 입구로 들어와 구역을 둘러보고, 직원에게 묻고, 책을 살펴본 뒤 나갑니다 (손님과 직원의 대화는 그 층 채팅에 공개). ' +
+          '오늘 호출을 한도의 70% 넘게 썼으면 손님은 오지 않습니다.');
       }
-      var fs = document.createElement('fieldset'); fs.dataset.agent = a.id;
-      var lg = document.createElement('legend'); lg.textContent = a.name + ' · ' + a.job; fs.appendChild(lg);
-      fs.appendChild(labeled(guest ? '방문하기' : '일하기', staffInput('input', a.enabled !== false, { type: 'checkbox', 'data-f': 'enabled' })));
-      [['name', '이름'], ['job', '직업'], ['goal', '목표'], ['personality', '성격']].forEach(function (f) {
-        fs.appendChild(labeled(guest && f[0] === 'goal' ? '찾는 것' : guest && f[0] === 'job' ? '소개' : f[1], staffInput(f[0] === 'goal' || f[0] === 'personality' ? 'textarea' : 'input', a[f[0]], { type: 'text', 'data-f': f[0] })));
-      });
-      if (!guest) fs.appendChild(labeled('부르는 말 (쉼표로)', staffInput('input', (a.call || []).join(', '), { type: 'text', 'data-f': 'call' })));
+      if (sub === '길 건너' && !firstOf[sub]) note(section(sub), '길 건너 건물(사무실·갤러리·재즈 청음실)에서 일하는 사람들. 가끔 손님처럼 서재에 들르고, 사서·도슨트의 보고는 대표가 받습니다.');
+      var fs = document.createElement('fieldset'); fs.dataset.agent = a.id; fs.dataset.sub = sub;
+      if (!firstOf[sub]) { firstOf[sub] = true; fs.classList.add('open'); }
+      var head = document.createElement('button'); head.type = 'button'; head.className = 'fs-head';
+      var hb = document.createElement('b'); hb.textContent = a.name; head.appendChild(hb);
+      var hs = document.createElement('small'); hs.textContent = a.job + (a.remote_url ? ' · 바깥 AI(전화)' : ''); head.appendChild(hs);
+      if (a.enabled === false) { var off = document.createElement('span'); off.className = 'off-tag'; off.textContent = guest ? '안 옴' : '쉼'; head.appendChild(off); }
+      var arrow = document.createElement('i'); arrow.textContent = '›'; head.appendChild(arrow);
+      head.addEventListener('click', function () { fs.classList.toggle('open'); });
+      fs.appendChild(head);
+      var fb = document.createElement('div'); fb.className = 'fs-body'; fs.appendChild(fb);
+      fb.appendChild(labeled(guest ? '방문하기' : '일하기', staffInput('input', a.enabled !== false, { type: 'checkbox', 'data-f': 'enabled' })));
+      var g2 = document.createElement('div'); g2.className = 'grid2'; fb.appendChild(g2);
+      g2.appendChild(labeled('이름', staffInput('input', a.name, { type: 'text', 'data-f': 'name' })));
+      g2.appendChild(labeled(guest ? '소개' : '직업', staffInput('input', a.job, { type: 'text', 'data-f': 'job' })));
+      if (!guest) g2.appendChild(labeled('부르는 말 (쉼표로)', staffInput('input', (a.call || []).join(', '), { type: 'text', 'data-f': 'call' })));
+      fb.appendChild(labeled(guest ? '찾는 것' : '목표', staffInput('textarea', a.goal, { type: 'text', 'data-f': 'goal' })));
+      fb.appendChild(labeled('성격', staffInput('textarea', a.personality, { type: 'text', 'data-f': 'personality' })));
       if (!guest) {   // 전화: 이 직원의 생각을 바깥 AI(예: 디스코드 봇 캐릭터)가 맡는다
-        fs.appendChild(labeled('바깥 AI 주소 (비우면 이 서버의 AI · 넣으면 질문·보고를 그 주소로 전화하고 자율 업무는 쉼)', staffInput('input', a.remote_url || '', { type: 'url', 'data-f': 'remote_url', placeholder: 'https://…/call' })));
-        fs.appendChild(labeled('바깥 AI 토큰 (Bearer)', staffInput('input', '', { type: 'password', 'data-f': 'remote_token', placeholder: a.remote_token_set ? '저장됨 - 바꿀 때만 입력' : '없음', autocomplete: 'new-password' })));
+        h4(fb, '바깥 AI (전화) - 넣으면 질문·보고를 그 주소로 보내고, 이 직원의 자율 업무는 쉼');
+        var g3 = document.createElement('div'); g3.className = 'grid2'; fb.appendChild(g3);
+        g3.appendChild(labeled('주소', staffInput('input', a.remote_url || '', { type: 'url', 'data-f': 'remote_url', placeholder: '비우면 이 서버의 AI' })));
+        g3.appendChild(labeled('토큰 (Bearer)', staffInput('input', '', { type: 'password', 'data-f': 'remote_token', placeholder: a.remote_token_set ? '저장됨 - 바꿀 때만 입력' : '없음', autocomplete: 'new-password' })));
       }
+      if ((a.tasks || []).length) h4(fb, guest ? '방문' : '혼자 하는 업무 (주기: 분)');
       (a.tasks || []).forEach(function (t) {
         var row = document.createElement('div'); row.className = 'task'; row.dataset.task = t.id;
         row.appendChild(staffInput('input', t.enabled !== false, { type: 'checkbox', 'data-t': 'enabled', title: '이 업무 켜기' }));
         var nm = document.createElement('b'); var lr = d.last_run[a.id + '/' + t.id];
-        nm.textContent = t.title + (lr ? ' (마지막 ' + new Date(lr * 1000).toLocaleString() + ')' : ' (아직 안 함)'); row.appendChild(nm);
+        nm.textContent = t.title; var when = document.createElement('small'); when.textContent = lr ? ' 마지막 ' + new Date(lr * 1000).toLocaleString() : ' 아직 안 함'; nm.appendChild(when); row.appendChild(nm);
         row.appendChild(staffInput('input', t.every_min, { type: 'number', min: 10, max: 10080, 'data-t': 'every_min', title: '주기(분)' }));
         var run = document.createElement('button'); run.type = 'button'; run.className = 'l3d-btn'; run.textContent = '지금 실행';
         run.addEventListener('click', function () {
@@ -3533,29 +3573,33 @@
           postJSON('api/lib3d/agents', { action: 'run', agent: a.id, task: t.id }).catch(function (e) { el('l3d-staff-msg').textContent = e.message; });
         });
         row.appendChild(run);
-        row.appendChild(staffInput('textarea', t.prompt, { 'data-t': 'prompt' }));
-        fs.appendChild(row);
+        var det = document.createElement('details'); det.className = 'task-prompt';
+        var sm = document.createElement('summary'); sm.textContent = '지시문'; det.appendChild(sm);
+        det.appendChild(staffInput('textarea', t.prompt, { 'data-t': 'prompt' }));
+        row.appendChild(det);
+        fb.appendChild(row);
       });
       var notes = (d.notes[a.id] || []).slice(-6);
-      if (notes.length) { var n = document.createElement('div'); n.className = 'notes'; n.textContent = '기억: ' + notes.join(' / '); fs.appendChild(n); }
+      if (notes.length) { var n = document.createElement('div'); n.className = 'notes'; n.textContent = '기억: ' + notes.join(' / '); fb.appendChild(n); }
       body.appendChild(fs);
     });
-    var lg2 = document.createElement('h4'); lg2.textContent = '활동 기록'; body.appendChild(lg2);
+    // ── 활동 기록 ──
+    var logSec = section('활동 기록', 'card');
     var logs = document.createElement('div'); logs.className = 'logs';
-    (d.log || []).slice(0, 15).forEach(function (e) {
+    (d.log || []).slice(0, 30).forEach(function (e) {
       var r = document.createElement('div');
       r.textContent = new Date(e.t * 1000).toLocaleString() + ' · ' + e.name + ' · ' + e.title + '\n' + e.text;
       logs.appendChild(r);
     });
     if (!(d.log || []).length) logs.textContent = '아직 기록이 없습니다.';
-    body.appendChild(logs);
+    logSec.appendChild(logs);
+    subTabs(body, ['기본·배달', '서재 직원', '길 건너', 'AI 손님', '활동 기록']);
   }
   function openStaff() {
     [setBox, aiBox, pplBox, outBox, mdlBox].forEach(function (b) { b.classList.remove('on'); }); staffBox.classList.add('on');
     el('l3d-staff-msg').textContent = '';
     api('api/lib3d/agents').then(drawStaff).catch(function (e) { el('l3d-staff-body').textContent = e.message; });
   }
-  el('l3d-set-staff').addEventListener('click', openStaff);
   el('l3d-staff-close').addEventListener('click', function () { staffBox.classList.remove('on'); });
   el('l3d-staff-reset').addEventListener('click', function () {
     if (!window.confirm('AI 직원·손님 설정을 기본값으로 되돌릴까요? (기억·활동 기록은 남습니다)')) return;
@@ -3579,15 +3623,45 @@
     postJSON('api/lib3d/agents', body).then(function (d) { drawStaff(d); el('l3d-staff-msg').textContent = '저장했습니다.'; })
       .catch(function (e) { el('l3d-staff-msg').textContent = e.message; });
   });
+  // ── 서재 설정 창: 위쪽 탭 하나로 (보관함 · AI 설정 · 인물 수 · 창밖 풍경 · 3D 모형 · AI 직원) ──
+  // 각 탭의 내용은 예전 설정 패널 그대로(열 때 불러오고, 패널마다 저장). 패널이 켜지면(.on) 창이 보이고 그 탭에 불이 들어온다
+  var cfgBox = el('l3d-cfg'), cfgTabsEl = el('l3d-cfg-tabs');
+  var CFG_TABS = [[setBox, '보여 줄 보관함', function () { openSettings(); }], [aiBox, 'AI 설정', function () { openAI(); }],
+                  [pplBox, '층별 인물 수', function () { if (floors.length) openPeople(); else pendingPeople = true; }],
+                  [outBox, '창밖 풍경', function () { openOutside(); }], [mdlBox, '3D 모형', function () { openModels(); }],
+                  [staffBox, 'AI 직원', function () { openStaff(); }]];
+  function cfgGo(i) {
+    CFG_TABS.forEach(function (t) { t[0].classList.remove('on'); });
+    CFG_TABS[i][2]();
+    CFG_TABS[i][0].classList.add('on');
+  }
+  CFG_TABS.forEach(function (t, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t[1];
+    b.addEventListener('click', function () { if (!t[0].classList.contains('on')) cfgGo(i); });
+    cfgTabsEl.appendChild(b);
+  });
+  function cfgSync() {   // 켜진 패널이 있으면 창을 띄우고 그 탭 표시
+    var any = false;
+    CFG_TABS.forEach(function (t, i) {
+      var on = t[0].classList.contains('on'); any = any || on;
+      cfgTabsEl.children[i].classList.toggle('on', on); cfgTabsEl.children[i].setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    cfgBox.classList.toggle('on', any);
+  }
+  if (window.MutationObserver) {
+    var cfgObs = new MutationObserver(cfgSync);
+    CFG_TABS.forEach(function (t) { cfgObs.observe(t[0], { attributes: true, attributeFilter: ['class'] }); });
+  }
+  function cfgClose() { CFG_TABS.forEach(function (t) { t[0].classList.remove('on'); }); cfgSync(); }
+  el('l3d-cfg-x').addEventListener('click', cfgClose);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cfgBox.classList.contains('on')) { e.stopPropagation(); cfgClose(); } }, true);
+  subTabs(aiBox.querySelector('.body'), ['연결', '기능', '도구']);
+  subTabs(outBox.querySelector('.body'), ['풍경', '거리', '현수막']);
   function hashNav() {
     if (ME && ME.role === 'viewer') return;
-    if (location.hash === '#outside') openOutside();
-    if (location.hash === '#models') openModels();
-    if (location.hash === '#staff') openStaff();
+    var tab = { '#settings': 0, '#ai': 1, '#people': 2, '#outside': 3, '#models': 4, '#staff': 5 }[location.hash];
+    if (tab != null) cfgGo(tab);
     if (location.hash === '#brunch' && BRUNCH_ON) openBrunch();
-    if (location.hash === '#settings') openSettings();
-    if (location.hash === '#ai') openAI();
-    if (location.hash === '#people') { if (floors.length) openPeople(); else pendingPeople = true; }
   }
   var pendingPeople = false;
   window.addEventListener('hashchange', hashNav);
@@ -5041,8 +5115,6 @@
     keys = {}; savePos();
     [setBox, aiBox, pplBox, outBox, mdlBox, staffBox, brBox, mpBox, cpBox].forEach(function (b) { if (b) b.classList.remove('on'); });
     fetch('api/lib3d/leave', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cid: CID }), keepalive: true }).catch(function () {});
-    var viewer = ME && ME.role === 'viewer';
-    el('l3d-left-home').hidden = viewer;
     el('l3d-left').classList.add('on');
   }
   function reenterLibrary() {
@@ -5052,7 +5124,6 @@
   }
   el('l3d-exit').addEventListener('click', leaveLibrary);
   el('l3d-left-back').addEventListener('click', reenterLibrary);
-  el('l3d-left-home').addEventListener('click', function () { location.href = '/'; });
   el('l3d-left-out').addEventListener('click', function () {
     fetch('api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' })
       .then(function () { location.href = '/login'; }, function () { location.href = '/login'; });

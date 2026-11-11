@@ -74,10 +74,64 @@
   .l3d-set-h { font-weight: 700; font-size: 0.85rem; padding: 10px 4px 4px; }
   .l3d-set-row { display: block; padding: 5px 4px 5px 22px; font-size: 0.86rem; cursor: pointer; }
   .l3d-set .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* 서재 설정: 창 하나 + 위쪽 탭 (보관함 · AI 설정 · 인물 수 · 창밖 풍경 · 3D 모형 · AI 직원), 복잡한 탭은 안에 하위 탭 */
+  .l3d-cfg { position: absolute; top: 12px; bottom: 12px; left: 50%; transform: translateX(-50%); width: min(780px, calc(100% - 24px)); z-index: 6;
+    display: none; flex-direction: column; background: #fbfaf7; color: #1d1e20; border-radius: 18px; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.28); overflow: hidden; }
+  .l3d-cfg.on { display: flex; }
+  .l3d-cfg { color-scheme: light; }   /* 다크 테마에서도 체크박스·입력칸은 밝게 (창이 흰색) */
+  .l3d-staff .card > .st-h:first-child { margin-top: 0; }
+  .l3d-cfg [hidden] { display: none !important; }
+  .l3d-cfg-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 6px; }
+  .l3d-cfg-head b { font-size: 1.05rem; }
+  .l3d-cfg-x { border: 0; background: #ece7de; color: #1d1e20; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 0.95rem; }
+  .l3d-cfg-x:hover { background: #e0d9cc; }
+  .l3d-cfg-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid #e6e1d8; overflow-x: auto; scrollbar-width: none; flex-shrink: 0; }
+  .l3d-cfg-tabs::-webkit-scrollbar { display: none; }
+  .l3d-cfg-tabs button { border: 0; background: none; color: #6b665e; font: inherit; font-size: 0.86rem; padding: 10px 12px; cursor: pointer; white-space: nowrap;
+    border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .l3d-cfg-tabs button:hover { color: #1d1e20; }
+  .l3d-cfg-tabs button.on { color: #1d1e20; font-weight: 700; border-bottom-color: #e5a00d; }
+  .l3d-cfg-panes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .l3d-cfg .l3d-set { position: static; inset: auto; width: auto; flex: 1; min-height: 0; background: none; box-shadow: none; border-radius: 0; padding: 12px 18px 14px; }
+  .l3d-cfg .l3d-set > h3 { display: none; }
+  .l3d-cfg .l3d-set .body, .l3d-cfg .l3d-set .list { flex: 1; min-height: 0; overflow: auto; }
+  .l3d-cfg .l3d-set .list { border: 1px solid #e6e1d8; border-radius: 12px; background: #fff; padding: 4px 8px; }
+  .l3d-cfg .row.foot { border-top: 1px solid #e6e1d8; padding-top: 10px; margin-top: 4px; }
+  .l3d-cfg .row.foot:empty, .l3d-cfg .row.foot:not(:has(button:not([hidden]))) { display: none; }
+  .l3d-sub-tabs { display: inline-flex; gap: 4px; background: #ece7de; border-radius: 999px; padding: 3px; margin: 0 0 10px; flex-wrap: wrap; }
+  .l3d-sub-tabs button { border: 0; background: none; font: inherit; font-size: 0.8rem; padding: 6px 12px; border-radius: 999px; cursor: pointer; color: #5b564e; }
+  .l3d-sub-tabs button.on { background: #fff; color: #1d1e20; font-weight: 700; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+  .l3d-cfg .card { background: #fff; border: 1px solid #e6e1d8; border-radius: 14px; padding: 12px 14px; margin: 0 0 10px; }
+  .l3d-cfg .card > .sub:first-child { margin-top: 0; }
+  .l3d-cfg .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .l3d-cfg .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 640px) {
+    .l3d-cfg { top: 0; bottom: 0; width: 100%; border-radius: 0; }
+    .l3d-cfg .grid2, .l3d-cfg .grid3 { grid-template-columns: 1fr; }
+    .l3d-cfg .l3d-set { padding: 10px 12px 12px; }
+  }
+  /* AI 직원: 사람마다 접고 펴는 카드 */
+  .l3d-cfg .l3d-staff fieldset { background: #fff; padding: 0; overflow: hidden; }
+  .l3d-cfg .l3d-staff legend { display: contents; }
+  .l3d-staff .fs-head { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; color: #1d1e20; font: inherit; text-align: left; padding: 10px 14px; cursor: pointer; }
+  .l3d-staff .fs-head b { font-size: 0.9rem; }
+  .l3d-staff .fs-head small { opacity: 0.6; font-size: 0.76rem; flex: 1; }
+  .l3d-staff .fs-head i { font-style: normal; opacity: 0.5; transition: transform 0.15s; }
+  .l3d-staff fieldset.open .fs-head i { transform: rotate(90deg); }
+  .l3d-staff .fs-body { display: none; padding: 0 14px 12px; border-top: 1px solid #f0ece4; }
+  .l3d-staff fieldset.open .fs-body { display: block; }
+  .l3d-staff .st-h { margin: 12px 0 4px; font-size: 0.8rem; color: #6b665e; font-weight: 700; }
+  .l3d-staff .task { grid-template-columns: auto 1fr 76px auto; background: #faf8f4; border-radius: 10px; padding: 6px 8px; }
+  .l3d-staff .task small { font-weight: 400; opacity: 0.6; margin-left: 4px; }
+  .l3d-staff .task-prompt { grid-column: 1 / -1; font-size: 0.78rem; }
+  .l3d-staff .task-prompt summary { cursor: pointer; opacity: 0.7; }
+  .l3d-staff .task-prompt textarea { width: 100%; box-sizing: border-box; margin-top: 4px; }
+  .l3d-cfg .l3d-ai textarea { width: 100%; box-sizing: border-box; }
+  .l3d-staff .off-tag { font-size: 0.7rem; background: #ece7de; border-radius: 6px; padding: 1px 6px; opacity: 0.8; }
   /* AI: 설정 패널·질문 창·손님 말풍선 */
   .l3d-ai label.f { display: grid; gap: 4px; font-size: 0.82rem; margin: 6px 0; }
   .l3d-ai label.c { display: flex; gap: 6px; align-items: center; font-size: 0.86rem; margin: 6px 0; cursor: pointer; }
-  .l3d-ai input[type=text], .l3d-ai input[type=password], .l3d-ai input[type=number], .l3d-ai select, .l3d-ai textarea { font: inherit; padding: 7px 9px; border: 1px solid #d9d3c8;
+  .l3d-ai input[type=text], .l3d-ai input[type=password], .l3d-ai input[type=url], .l3d-ai input[type=number], .l3d-ai select, .l3d-ai textarea { font: inherit; padding: 7px 9px; border: 1px solid #d9d3c8;
     border-radius: 8px; background: #fff; color: #1d1e20; min-width: 0; }
   .l3d-ai .warn { color: #b3261e; }
   .l3d-ai .body { flex: 1; overflow: auto; }
@@ -308,7 +362,11 @@
       </div>
     </div>
     <div class="l3d-map" id="l3d-map"></div>
-    <div class="l3d-set" id="l3d-set" role="dialog" aria-label="3D 서재 설정">
+    <div class="l3d-cfg" id="l3d-cfg" role="dialog" aria-label="서재 설정">
+      <div class="l3d-cfg-head"><b>서재 설정</b><button type="button" class="l3d-cfg-x" id="l3d-cfg-x" aria-label="설정 닫기" title="닫기 (Esc)">✕</button></div>
+      <div class="l3d-cfg-tabs" id="l3d-cfg-tabs" role="tablist"></div>
+      <div class="l3d-cfg-panes">
+    <div class="l3d-set" id="l3d-set" role="tabpanel" aria-label="보여 줄 보관함">
       <h3>보여 줄 보관함</h3>
       <p class="sub">고른 보관함만 서재에 진열합니다. 세션마다 한 층이고, 고른 것이 없는 세션은 층이 없어집니다.</p>
       <div class="list" id="l3d-set-list"></div>
@@ -316,51 +374,54 @@
       <div class="row">
         <button type="button" class="l3d-btn primary" id="l3d-set-save">저장</button>
         <button type="button" class="l3d-btn" id="l3d-set-all">전부 보기</button>
-        <button type="button" class="l3d-btn" id="l3d-set-close">닫기</button>
-        <button type="button" class="l3d-btn" id="l3d-set-ai">AI 설정</button>
-        <button type="button" class="l3d-btn" id="l3d-set-ppl">인물 수</button>
-        <button type="button" class="l3d-btn" id="l3d-set-out">창밖 풍경</button>
-        <button type="button" class="l3d-btn" id="l3d-set-mdl">3D 모형</button>
-        <button type="button" class="l3d-btn" id="l3d-set-staff">AI 직원</button>
+        <button type="button" class="l3d-btn" id="l3d-set-close" hidden>닫기</button>
       </div>
     </div>
-    <div class="l3d-set l3d-ai" id="l3d-ai" role="dialog" aria-label="3D 서재 AI 설정">
-      <h3>AI 손님·질문하기</h3>
-      <p class="sub">LLM이 손님들의 책 대화를 쓰고, 질문에 답합니다(BookOasis MCP로 서재 데이터, 기본 도구로 시각·날씨·웹 페이지, 추가 MCP로 그 밖의 것). 유료 API면 호출할 때마다 요금이 듭니다.</p>
+    <div class="l3d-set l3d-ai" id="l3d-ai" role="tabpanel" aria-label="AI 설정">
+      <h3>AI 설정</h3>
       <div class="body">
-        <label class="f">연결 방식
-          <select id="l3d-ai-provider">
-            <option value="openai">OpenAI 호환 /chat/completions (LiteLLM·Ollama·LM Studio·OpenAI 등)</option>
-            <option value="anthropic">Claude API (Anthropic)</option>
-          </select></label>
-        <label class="f" id="l3d-ai-base-f">API 주소 (Base URL)
-          <input type="text" id="l3d-ai-base" placeholder="http://192.168.0.10:4000/v1"></label>
-        <p class="sub warn" id="l3d-ai-sdk" hidden>서버에 anthropic 패키지가 없습니다. <code>pip install anthropic</code> 후 다시 시작하세요.</p>
-        <label class="f">API 키 <input type="password" id="l3d-ai-key" autocomplete="off" placeholder="sk-..."></label>
-        <label class="c"><input type="checkbox" id="l3d-ai-clear"> 저장된 키 지우기</label>
-        <label class="f">모델 이름 <input type="text" id="l3d-ai-model" list="l3d-ai-models" placeholder="예: my-model"></label>
-        <datalist id="l3d-ai-models"></datalist>
-        <label class="c"><input type="checkbox" id="l3d-ai-chat"> 손님 대화 (층마다 두 손님이 책 한 권을 두고 이야기)</label>
-        <label class="f">대화 사이 최소 간격(초) <input type="number" id="l3d-ai-sec" min="15" max="3600" step="5"></label>
-        <label class="c"><input type="checkbox" id="l3d-ai-ask"> AI 직원과 대화 - 채팅창에서 <code>@사서</code>·<code>@도슨트</code> + 할 말 (답은 부른 사람에게만, 직원의 말·행동은 모두에게)</label>
-        <label class="f">BookOasis MCP 실행 명령
-          <input type="text" id="l3d-ai-mcp" placeholder="docker exec -i bookoasis python3 tools/mcp_server.py"></label>
-        <p class="sub">BookOasis가 같은 서버에 직접 설치돼 있으면 <code>python3 /BookOasis경로/tools/mcp_server.py</code>. 읽기 전용 도구만 씁니다.</p>
-        <label class="f">하루 AI 호출 한도 (손님 대화·AI 직원 모두 합쳐서, 0이면 무제한) <input type="number" id="l3d-ai-daily" min="0" max="100000" step="50"></label>
-        <p class="sub" id="l3d-ai-budget"></p>
-        <label class="c"><input type="checkbox" id="l3d-ai-builtin"> 기본 도구 - 지금 시각·날씨(Open-Meteo)·웹 페이지 읽기</label>
-        <label class="f"><span>추가 MCP 서버 - 한 줄에 <code>이름 = 실행 명령</code> 또는 <code>이름 = https://주소</code></span>
-          <textarea id="l3d-ai-servers" rows="4" placeholder="fetch = uvx mcp-server-fetch&#10;time = uvx mcp-server-time --local-timezone=Asia/Seoul&#10;remote = https://example.com/mcp"></textarea></label>
-        <p class="sub">추가 MCP의 도구는 모든 도구(쓰기 포함)를 그대로 씁니다 - 믿을 수 있는 서버만 넣으세요. 실행 명령은 이 서버에서 실행됩니다.</p>
+        <section class="card" data-sub="연결">
+          <p class="sub">손님 대화·AI 직원이 쓸 LLM. 유료 API면 호출할 때마다 요금이 듭니다.</p>
+          <label class="f">연결 방식
+            <select id="l3d-ai-provider">
+              <option value="openai">OpenAI 호환 /chat/completions (LiteLLM·Ollama·LM Studio·OpenAI 등)</option>
+              <option value="anthropic">Claude API (Anthropic)</option>
+            </select></label>
+          <label class="f" id="l3d-ai-base-f">API 주소 (Base URL)
+            <input type="text" id="l3d-ai-base" placeholder="http://192.168.0.10:4000/v1"></label>
+          <p class="sub warn" id="l3d-ai-sdk" hidden>서버에 anthropic 패키지가 없습니다. <code>pip install anthropic</code> 후 다시 시작하세요.</p>
+          <div class="grid2">
+            <label class="f">API 키 <input type="password" id="l3d-ai-key" autocomplete="off" placeholder="sk-..."></label>
+            <label class="f">모델 이름 <input type="text" id="l3d-ai-model" list="l3d-ai-models" placeholder="예: my-model"></label>
+          </div>
+          <datalist id="l3d-ai-models"></datalist>
+          <label class="c"><input type="checkbox" id="l3d-ai-clear"> 저장된 키 지우기</label>
+        </section>
+        <section class="card" data-sub="기능">
+          <label class="c"><input type="checkbox" id="l3d-ai-chat"> 손님 대화 - 층마다 두 손님이 책 한 권을 두고 이야기 (말풍선)</label>
+          <label class="f">대화 사이 최소 간격(초) <input type="number" id="l3d-ai-sec" min="15" max="3600" step="5"></label>
+          <label class="c"><input type="checkbox" id="l3d-ai-ask"> AI 직원과 대화 - 채팅창에서 <code>@사서</code>·<code>@도슨트</code> + 할 말 (답은 부른 사람에게만, 직원의 말·행동은 모두에게)</label>
+          <label class="f">하루 AI 호출 한도 (손님 대화·AI 직원 모두 합쳐서, 0이면 무제한) <input type="number" id="l3d-ai-daily" min="0" max="100000" step="50"></label>
+          <p class="sub" id="l3d-ai-budget"></p>
+        </section>
+        <section class="card" data-sub="도구">
+          <label class="f">BookOasis MCP 실행 명령
+            <input type="text" id="l3d-ai-mcp" placeholder="docker exec -i bookoasis python3 tools/mcp_server.py"></label>
+          <p class="sub">BookOasis가 같은 서버에 직접 설치돼 있으면 <code>python3 /BookOasis경로/tools/mcp_server.py</code>. 읽기 전용 도구만 씁니다.</p>
+          <div class="row"><button type="button" class="l3d-btn" id="l3d-ai-test">MCP 연결 시험</button></div>
+          <label class="c"><input type="checkbox" id="l3d-ai-builtin"> 기본 도구 - 지금 시각·날씨(Open-Meteo)·웹 페이지 읽기</label>
+          <label class="f"><span>추가 MCP 서버 - 한 줄에 <code>이름 = 실행 명령</code> 또는 <code>이름 = https://주소</code></span>
+            <textarea id="l3d-ai-servers" rows="4" placeholder="fetch = uvx mcp-server-fetch&#10;time = uvx mcp-server-time --local-timezone=Asia/Seoul&#10;remote = https://example.com/mcp"></textarea></label>
+          <p class="sub">추가 MCP의 도구는 모든 도구(쓰기 포함)를 그대로 씁니다 - 믿을 수 있는 서버만 넣으세요. 실행 명령은 이 서버에서 실행됩니다.</p>
+        </section>
       </div>
       <p class="sub" id="l3d-ai-msg"></p>
-      <div class="row">
+      <div class="row foot">
         <button type="button" class="l3d-btn primary" id="l3d-ai-save">저장</button>
-        <button type="button" class="l3d-btn" id="l3d-ai-test">MCP 연결 시험</button>
-        <button type="button" class="l3d-btn" id="l3d-ai-close">닫기</button>
+        <button type="button" class="l3d-btn" id="l3d-ai-close" hidden>닫기</button>
       </div>
     </div>
-    <div class="l3d-set l3d-ai l3d-ppl" id="l3d-ppl" role="dialog" aria-label="층별 인물 수">
+    <div class="l3d-set l3d-ai l3d-ppl" id="l3d-ppl" role="tabpanel" aria-label="층별 인물 수">
       <h3>층별 인물 수</h3>
       <p class="sub">층마다 각 인물을 몇 명 둘지 정합니다 (0~20). 비워 두면 자동입니다 — 걷는 손님은 보관함 수에 따라 2~5명, 책 고르는·서서 읽는 손님은 구역마다 확률로, 대화하는 손님은 AI 손님 대화가 켜졌을 때 한 쌍, 숨은 인물은 층에 들어올 때 3번에 1번꼴, 나머지는 1명.</p>
       <div class="body"><table class="l3d-ppl-t" id="l3d-ppl-t"></table></div>
@@ -368,42 +429,48 @@
       <div class="row">
         <button type="button" class="l3d-btn primary" id="l3d-ppl-save">저장</button>
         <button type="button" class="l3d-btn" id="l3d-ppl-auto">모두 자동</button>
-        <button type="button" class="l3d-btn" id="l3d-ppl-close">닫기</button>
+        <button type="button" class="l3d-btn" id="l3d-ppl-close" hidden>닫기</button>
       </div>
     </div>
-    <div class="l3d-set l3d-ai" id="l3d-out" role="dialog" aria-label="창밖 풍경">
+    <div class="l3d-set l3d-ai" id="l3d-out" role="tabpanel" aria-label="창밖 풍경">
       <h3>창밖 풍경</h3>
-      <p class="sub">시간·계절·날씨를 따로 고릅니다. 자동이면 시간은 이 브라우저 시계, 계절은 지금 달, 날씨는 날마다 바뀝니다(겨울엔 눈, 그 밖엔 비가 가끔).</p>
       <div class="body">
-        <label class="f">시간 <select id="l3d-out-time"><option value="auto">자동 (시계)</option><option value="day">낮</option><option value="dusk">노을</option><option value="night">밤</option></select></label>
-        <label class="f">계절 <select id="l3d-out-season"><option value="auto">자동 (지금 달)</option><option value="spring">봄 (벚꽃)</option><option value="summer">여름</option><option value="autumn">가을 (단풍)</option><option value="winter">겨울 (눈 덮임)</option></select></label>
-        <label class="f">날씨 <select id="l3d-out-weather"><option value="clear">맑음</option><option value="cloudy">흐림</option><option value="rain">비</option><option value="snow">눈</option><option value="auto">자동 (날마다)</option></select></label>
-        <h4 style="margin:12px 0 4px">거리 (1층 밖 길 건너 건물)</h4>
-        <p class="sub">간판 이름과, 1층에 들어갈 수 있는 건물을 정합니다. 갤러리·청음실은 서재 옆 오른쪽, 사무실은 왼쪽 건물에 생깁니다. 비우면 그 공간은 만들지 않습니다.</p>
-        <label class="f">간판 이름 (한 줄에 하나, 16개까지) <textarea id="l3d-st-signs" rows="4"></textarea></label>
-        <label class="f">갤러리 건물 (표지 액자) <input type="text" id="l3d-st-gallery" maxlength="24"></label>
-        <label class="f">재즈 청음실 건물 <input type="text" id="l3d-st-jazz" maxlength="24"></label>
-        <label class="f">사무실 건물 <input type="text" id="l3d-st-office" maxlength="24"></label>
-        <label class="f">현수막을 거는 건물 <select id="l3d-st-banner"></select></label>
-        <div class="row"><button type="button" class="l3d-btn" id="l3d-st-save">거리 저장</button></div>
-        <h4 style="margin:12px 0 4px">현수막</h4>
-        <label class="f">현수막
-          <select id="l3d-out-bmode"><option value="">없음</option><option value="url">그림 주소</option><option value="library">보관함 표지 (무작위로 바뀜)</option></select></label>
-        <label class="f" id="l3d-out-burl"><span>그림 주소 (jpg·png·gif·webp)</span>
-          <input type="text" id="l3d-out-banner" placeholder="https://example.com/banner.jpg"></label>
-        <div id="l3d-out-blib">
-          <label class="f">보관함 <select id="l3d-out-banner-lib"><option value="">보관함 고르기</option></select></label>
-          <label class="f">바꾸는 간격(초) <input type="number" id="l3d-out-banner-sec" min="5" max="3600" step="5" value="30"></label>
-        </div>
-        <div class="row"><button type="button" class="l3d-btn" id="l3d-out-banner-save">현수막 걸기</button></div>
+        <section class="card" data-sub="풍경">
+          <p class="sub">고르는 즉시 미리 보입니다. 자동이면 시간은 이 브라우저 시계, 계절은 지금 달, 날씨는 날마다 바뀝니다(겨울엔 눈, 그 밖엔 비가 가끔).</p>
+          <div class="grid3">
+            <label class="f">시간 <select id="l3d-out-time"><option value="auto">자동 (시계)</option><option value="day">낮</option><option value="dusk">노을</option><option value="night">밤</option></select></label>
+            <label class="f">계절 <select id="l3d-out-season"><option value="auto">자동 (지금 달)</option><option value="spring">봄 (벚꽃)</option><option value="summer">여름</option><option value="autumn">가을 (단풍)</option><option value="winter">겨울 (눈 덮임)</option></select></label>
+            <label class="f">날씨 <select id="l3d-out-weather"><option value="clear">맑음</option><option value="cloudy">흐림</option><option value="rain">비</option><option value="snow">눈</option><option value="auto">자동 (날마다)</option></select></label>
+          </div>
+          <div class="row"><button type="button" class="l3d-btn primary" id="l3d-out-save">풍경 저장</button></div>
+        </section>
+        <section class="card" data-sub="거리">
+          <p class="sub">1층 밖 길 건너 건물의 간판과, 들어갈 수 있는 건물을 정합니다. 갤러리·청음실은 서재 옆 오른쪽, 사무실은 왼쪽 건물에 생깁니다. 비우면 그 공간은 만들지 않습니다.</p>
+          <label class="f">간판 이름 (한 줄에 하나, 16개까지) <textarea id="l3d-st-signs" rows="4"></textarea></label>
+          <div class="grid2">
+            <label class="f">갤러리 건물 (표지 액자) <input type="text" id="l3d-st-gallery" maxlength="24"></label>
+            <label class="f">재즈 청음실 건물 <input type="text" id="l3d-st-jazz" maxlength="24"></label>
+            <label class="f">사무실 건물 <input type="text" id="l3d-st-office" maxlength="24"></label>
+            <label class="f">현수막을 거는 건물 <select id="l3d-st-banner"></select></label>
+          </div>
+          <div class="row"><button type="button" class="l3d-btn primary" id="l3d-st-save">거리 저장</button></div>
+        </section>
+        <section class="card" data-sub="현수막">
+          <label class="f">현수막
+            <select id="l3d-out-bmode"><option value="">없음</option><option value="url">그림 주소</option><option value="library">보관함 표지 (무작위로 바뀜)</option></select></label>
+          <label class="f" id="l3d-out-burl"><span>그림 주소 (jpg·png·gif·webp)</span>
+            <input type="text" id="l3d-out-banner" placeholder="https://example.com/banner.jpg"></label>
+          <div id="l3d-out-blib" class="grid2">
+            <label class="f">보관함 <select id="l3d-out-banner-lib"><option value="">보관함 고르기</option></select></label>
+            <label class="f">바꾸는 간격(초) <input type="number" id="l3d-out-banner-sec" min="5" max="3600" step="5" value="30"></label>
+          </div>
+          <div class="row"><button type="button" class="l3d-btn primary" id="l3d-out-banner-save">현수막 걸기</button></div>
+        </section>
       </div>
       <p class="sub" id="l3d-out-msg"></p>
-      <div class="row">
-        <button type="button" class="l3d-btn primary" id="l3d-out-save">저장</button>
-        <button type="button" class="l3d-btn" id="l3d-out-close">닫기</button>
-      </div>
+      <div class="row foot"><button type="button" class="l3d-btn" id="l3d-out-close" hidden>닫기</button></div>
     </div>
-    <div class="l3d-set l3d-ai" id="l3d-mdl" role="dialog" aria-label="3D 모형">
+    <div class="l3d-set l3d-ai" id="l3d-mdl" role="tabpanel" aria-label="3D 모형">
       <h3>3D 모형</h3>
       <p class="sub">로비 라운지의 소파·의자, 화분, 바깥 차를 무엇으로 보여 줄지 고릅니다. 책장·건물·나무는 어느 쪽이든 그대로입니다.</p>
       <div class="body">
@@ -416,18 +483,19 @@
       <p class="sub" id="l3d-mdl-msg"></p>
       <div class="row">
         <button type="button" class="l3d-btn primary" id="l3d-mdl-save">저장</button>
-        <button type="button" class="l3d-btn" id="l3d-mdl-close">닫기</button>
+        <button type="button" class="l3d-btn" id="l3d-mdl-close" hidden>닫기</button>
       </div>
     </div>
-    <div class="l3d-set l3d-ai l3d-staff" id="l3d-staff" role="dialog" aria-label="AI 직원">
+    <div class="l3d-set l3d-ai l3d-staff" id="l3d-staff" role="tabpanel" aria-label="AI 직원">
       <h3>AI 직원</h3>
-      <p class="sub">직원마다 직업·목표·성격을 정하고, 이용자가 없어도 정해진 주기로 혼자 하는 업무를 켭니다. 직원은 월드 행동(걷기·말하기·책 가리키기·안내판 바꾸기·기억하기)과 BookOasis 도구를 씁니다.</p>
       <div class="body" id="l3d-staff-body">불러오는 중...</div>
       <p class="sub" id="l3d-staff-msg"></p>
       <div class="row">
         <button type="button" class="l3d-btn primary" id="l3d-staff-save">저장</button>
         <button type="button" class="l3d-btn" id="l3d-staff-reset">기본값으로</button>
-        <button type="button" class="l3d-btn" id="l3d-staff-close">닫기</button>
+        <button type="button" class="l3d-btn" id="l3d-staff-close" hidden>닫기</button>
+      </div>
+    </div>
       </div>
     </div>
     <div class="l3d-set l3d-ai l3d-brunch" id="l3d-brunch" role="dialog" aria-label="브런치 연재 낭독">
@@ -590,7 +658,6 @@
         <p>소리·재생·움직임을 모두 멈췄습니다. 다른 사람들에게도 나간 것으로 보이고, 아무도 없으면 AI 직원·손님도 쉽니다.</p>
         <div class="row">
           <button type="button" class="l3d-btn primary" id="l3d-left-back">다시 들어가기</button>
-          <button type="button" class="l3d-btn" id="l3d-left-home">관리 화면으로</button>
           <button type="button" class="l3d-btn" id="l3d-left-out">로그아웃</button>
         </div>
       </div>

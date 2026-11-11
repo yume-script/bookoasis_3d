@@ -229,10 +229,12 @@ def save_config(body):
             url = str(upd["remote_url"] or "").strip()
             if url and not re.match(r"^https?://[^\s]+$", url):
                 raise ValueError("바깥 AI 주소는 http:// 또는 https://로 시작해야 합니다.")
-            a["remote_url"] = url[:300]
-            if not url:
+            if url:
+                a["remote_url"] = url[:300]
+            else:   # 빈칸: 이 서버의 AI로 (주소·토큰 모두 지움)
+                a.pop("remote_url", None)
                 a.pop("remote_token", None)
-        if str(upd.get("remote_token") or "").strip():   # 비워 두면 저장된 토큰 유지
+        if a.get("remote_url") and str(upd.get("remote_token") or "").strip():   # 비워 두면 저장된 토큰 유지
             a["remote_token"] = str(upd["remote_token"]).strip()[:300]
         if "call" in upd:
             calls = [c.strip() for c in re.split(r"[,\s]+", " ".join(upd["call"]) if isinstance(upd["call"], list) else str(upd["call"])) if c.strip()]
