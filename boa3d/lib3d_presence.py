@@ -20,6 +20,14 @@ _LAST_SAY = {}
 _LISTENERS = []        # 새 채팅을 받을 함수 (디스코드 보내기) - 귓속말은 주지 않는다
 
 
+_SEEN_HOOKS = []       # 누가 서재에 있다는 소식을 받을 함수 (이름, 층) - 접속 알림용
+
+
+def add_seen_hook(fn):
+    if fn not in _SEEN_HOOKS:
+        _SEEN_HOOKS.append(fn)
+
+
 def add_listener(fn):
     if fn not in _LISTENERS:
         _LISTENERS.append(fn)
@@ -85,6 +93,11 @@ def update(key, body, name=None):
         chat = [c for c in mine if c["id"] > since] if since >= 0 else []
         if since == 0:          # 처음 들어오면 최근 몇 개만
             chat = mine[-10:]
+    for fn in list(_SEEN_HOOKS):
+        try:
+            fn(name or key.split("#")[0], floor)
+        except Exception:  # noqa: BLE001 - 알림이 위치 소식을 막으면 안 된다
+            pass
     for o in others:
         o.pop("t", None)
         o.pop("name", None)
@@ -92,7 +105,7 @@ def update(key, body, name=None):
 
 
 def post(user, text, floor="", to=None, books=None, src="staff"):
-    """서버가 남기는 메시지 (to가 있으면 그 사람에게만). src: staff(AI 직원·손님) | delivery | discord"""
+    """서버가 남기는 메시지 (to가 있으면 그 사람에게만). src: staff(AI 직원·손님) | delivery | discord | activity(서재 소식)"""
     with _LOCK:
         _SEQ["chat"] += 1
         msg = {"id": _SEQ["chat"], "user": user, "floor": str(floor or "")[:40], "text": str(text)[:4000], "t": time.time(), "src": src}

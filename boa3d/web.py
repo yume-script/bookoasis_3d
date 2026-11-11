@@ -26,7 +26,7 @@ import zipfile
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_presence, lib3d_ymp
+from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_activity, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_presence, lib3d_ymp
 
 log = logging.getLogger("boa3d.web")
 WEB_DIR = os.path.join(config.ROOT, "web")
@@ -721,6 +721,8 @@ class Handler(BaseHTTPRequestHandler):
 def make_server(host, port):
     server = ThreadingHTTPServer((host, port), Handler)
     lib3d_discord.start()   # 디스코드 채널 연동 (.env에 웹후크·봇 토큰이 있을 때만 실제로 주고받음)
+    lib3d_presence.add_seen_hook(lib3d_activity.on_presence)
+    lib3d_activity.start()   # 서재 소식: 접속·읽기·재생 알림 (LIB3D_ACTIVITY)
     lib3d_agents.start()   # AI 직원 자율 업무 (AI 설정이 돼 있고 자율 업무가 켜져 있을 때만 실제로 일함)
     server.daemon_threads = True
     _fetch_latest()

@@ -406,6 +406,23 @@ curl -X POST http://서버:포트/api/lib3d/events -H "Authorization: Bearer $LI
 
 두 경우 모두 `agent` `{id, name, job}`(맡은 직원), `server: "bookoasis_lib3d"`가 함께 옵니다.
 
+### 6-10. 서재 소식 (접속·읽기·재생 알림)
+
+누가 3D 서재에 들어왔는지, 누가 무엇을 읽고·듣고·보는지 채팅에 **서재 소식** 이름으로 알려 줍니다.
+
+| 알림 | 어디서 아는가 | 필요한 설정 |
+|---|---|---|
+| `join` ○○님이 3D 서재에 들어왔어요 | 3D 서재 접속 (같은 사람은 10분 안에 다시 알리지 않음) | 없음 |
+| `read` ○○님이 「작품」을 읽고/듣고/보고 있어요 | BookOasis DB의 진행 기록과 사용자 이름 (45초마다 새로 바뀐 것만) | BookOasis DB 연결 (이미 쓰는 것) |
+| `watch` ○○님이 Plex에서 「작품」을 보고 있어요 | Plex 서버의 지금 재생 | `LIB3D_PLEX_URL`, `LIB3D_PLEX_TOKEN` |
+| `watch` ○○님이 YMPlayer에서 「작품」을 보고 있어요 | YMPlayer MCP의 `now_watching` (YMPlayer 1.1.94부터) | `LIB3D_YMPLAYER_MCP_TOKEN` (관리자 사용자의 MCP 토큰) |
+
+- 무엇을 알릴지는 `.env`의 `LIB3D_ACTIVITY=join,read,watch` (비우면 전부 끔). 제목에 특정 말이 있으면 빼려면 `LIB3D_ACTIVITY_SKIP`.
+- 성인 서재(BookOasis adult DB)와 성인 등급 Plex 영상, 성인 층 접속은 알리지 않습니다. 같은 사람·같은 작품은 30분에 한 번만 알립니다.
+- Plex에서 보이는 이름은 Plex 계정 이름입니다(YMPlayer로 Plex를 보면 Plex에는 서버 주인 계정으로 보이고, YMPlayer 알림에는 YMPlayer 사용자 이름으로 나옵니다).
+- 디스코드로도 보내려면 `LIB3D_DISCORD_SEND`에 `activity`를 더합니다.
+- 처음 켰을 때는 기준만 잡고, 그 뒤 새로 생긴 것부터 알립니다.
+
 ### 6-9. 디스코드 채널 연동 (선택, 기본 꺼짐)
 
 디스코드 채널 하나와 1층 채팅을 잇습니다. 디스코드 봇 프로그램을 따로 돌릴 필요가 없고, 이 서버로 들어오는 연결도 없습니다(서재가 디스코드로 나가서 보내고 읽음). `.env`에 넣고 다시 시작하면 켜집니다.

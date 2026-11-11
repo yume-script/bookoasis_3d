@@ -125,7 +125,7 @@ def _on_chat(msg):
         return
     if str(msg.get("floor") or "") == "adult":
         return
-    kind = {"user": "chat", "delivery": "delivery"}.get(msg.get("src"), "staff")
+    kind = {"user": "chat", "delivery": "delivery", "activity": "activity"}.get(msg.get("src"), "staff")
     if kind not in send_kinds():
         return
     text = " ".join(str(msg.get("text") or "").split())

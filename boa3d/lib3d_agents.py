@@ -20,7 +20,7 @@ import threading
 import time
 import urllib.request
 
-from . import config, lib3d, lib3d_ai, lib3d_discord, lib3d_events, lib3d_presence
+from . import config, lib3d, lib3d_activity, lib3d_ai, lib3d_discord, lib3d_events, lib3d_presence
 
 log = logging.getLogger("boa3d.lib3d_agents")
 
@@ -990,4 +990,4 @@ def admin_info():
     return {"config": cfg, "last_run": st["last_run"], "present": lib3d_presence.active_count(), "log": st["log"][-40:][::-1], "budget": lib3d_ai.budget(),
             "notes": {k: v.get("notes", []) for k, v in st["agents"].items()}, "configured": lib3d_ai.configured(),
             "deliveries": lib3d_events.recent(), "events_on": bool(config.env("LIB3D_EVENT_TOKEN", "").strip()),
-            "discord": lib3d_discord.status(), "remote_on": remote_enabled()}
+            "discord": lib3d_discord.status(), "remote_on": remote_enabled(), "activity": lib3d_activity.status()}
