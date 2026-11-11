@@ -116,10 +116,10 @@
     applyTheme();
   }
 
-  // ── 로고 / 파비콘: YMPlayer 아이콘에서 재생(▷) 대신 'P' ──
+  // ── 로고 / 파비콘: YMPlayer 아이콘에서 재생(▷) 대신 '3D' ──
   var LOGO_INNER = '<rect class="logo-bg" width="64" height="64" rx="15"/>' +
     '<circle class="logo-ink" cx="27" cy="33" r="19"/><circle class="logo-bg" cx="37" cy="26" r="15.5"/>' +
-    '<text class="logo-ink logo-p" x="37.6" y="27" text-anchor="middle" dominant-baseline="central">P</text>';
+    '<text class="logo-ink logo-p" x="37.4" y="26.6" text-anchor="middle" dominant-baseline="central" style="font-size:14.5px;letter-spacing:-0.6px">3D</text>';
   var BRAND_HTML = '<i>B</i>ook<i>O</i>asis<i>3D</i>';
   var ACCENT_HEX = { amber: ['#e5a00d', '#141517'], blue: ['#3b82f6', '#ffffff'], green: ['#22c55e', '#06200f'],
     purple: ['#a855f7', '#ffffff'], red: ['#ef4444', '#ffffff'], pink: ['#ec4899', '#ffffff'], teal: ['#14b8a6', '#032420'] };
@@ -127,8 +127,8 @@
     var c = ACCENT_HEX[mine.accent || defaults.accent] || ACCENT_HEX.amber;
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="' + c[0] + '"/>' +
       '<circle cx="27" cy="33" r="19" fill="' + c[1] + '"/><circle cx="37" cy="26" r="15.5" fill="' + c[0] + '"/>' +
-      '<text x="37.6" y="27" text-anchor="middle" dominant-baseline="central" font-family="Arial,Helvetica,sans-serif" ' +
-      'font-weight="900" font-size="22" fill="' + c[1] + '">P</text></svg>';
+      '<text x="37.4" y="26.6" text-anchor="middle" dominant-baseline="central" font-family="Arial,Helvetica,sans-serif" ' +
+      'font-weight="900" font-size="15" letter-spacing="-0.6" fill="' + c[1] + '">3D</text></svg>';
     var link = document.querySelector('link[rel="icon"]');
     if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
     link.type = 'image/svg+xml';
