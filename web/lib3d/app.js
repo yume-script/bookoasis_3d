@@ -404,7 +404,9 @@
     grass: new T.MeshStandardMaterial({ map: grassTex, roughness: 1 }),
     pave: new T.MeshStandardMaterial({ map: paveTex, roughness: 0.95 }),
     road: new T.MeshStandardMaterial({ map: roadTex, roughness: 0.9 }),
-    trunk: new T.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 }),
+    trunk: new T.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.95, map: barkTex }),
+    leafCore: [0x35522d, 0x3f5c33, 0x2f4a2a, 0x4a6638].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }); }),   // 잎 사이로 보이는 속 그늘
+    leafCard: [0x5d8a4e, 0x6f9a55, 0x4f7a44, 0x83a862].map(function (c) { return new T.MeshStandardMaterial({ color: c, map: leafTex, alphaTest: 0.4, side: T.DoubleSide, roughness: 0.85 }); }),
     leaf: [0x5d8a4e, 0x6f9a55, 0x4f7a44, 0x83a862].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }); }),
     facade: [0, 1].reduce(function (acc, st) { return acc.concat(FACADE_COLORS.map(function (c) { var m = new T.MeshStandardMaterial({ map: FACADE_TEX[st].color, color: c, roughness: 1, metalness: 1, roughnessMap: FACADE_TEX[st].pbr, metalnessMap: FACADE_TEX[st].pbr, bumpMap: FACADE_TEX[st].bump, bumpScale: 0.06 }); m.userData.style = st; return m; })); }, []),
     shopGlass: new T.MeshStandardMaterial({ color: 0x2a3540, roughness: 0.1, metalness: 0.5, emissive: 0x000000, emissiveIntensity: 0.9 }),
@@ -415,6 +417,78 @@
   var poolGeo = new T.PlaneGeometry(7, 7); poolGeo.userData.shared = true;
   var trunkGeo = new T.CylinderGeometry(0.12, 0.18, 2.6, 8), crownGeo = new T.IcosahedronGeometry(1.6, 1), unitBox = new T.BoxGeometry(1, 1, 1);
   [trunkGeo, crownGeo, unitBox].forEach(function (gq) { gq.userData.shared = true; });
+  // ── 실제 나무 느낌: 나무껍질 줄기 + 갈라진 가지, 잎사귀 뭉치 카드(투명 그림)를 수관에 겹겹이, 침엽수는 층층이 처진 가지 ──
+  function mergeGeos(list) {   // [[geometry, Matrix4]…] → 하나로 (위치·법선·UV·색인)
+    var pos = [], nor = [], uv = [], idx = [], base = 0, v = new T.Vector3(), nm = new T.Matrix3();
+    list.forEach(function (it) {
+      var g = it[0], m = it[1], p = g.attributes.position, n = g.attributes.normal, u = g.attributes.uv, ix = g.index;
+      nm.getNormalMatrix(m);
+      for (var i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m); pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z);
+        uv.push(u.getX(i), u.getY(i));
+      }
+      if (ix) for (var k = 0; k < ix.count; k++) idx.push(base + ix.getX(k)); else for (var k2 = 0; k2 < p.count; k2++) idx.push(base + k2);
+      base += p.count; g.dispose();
+    });
+    var out = new T.BufferGeometry();
+    out.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+    out.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); out.setIndex(idx); out.userData.shared = true;
+    return out;
+  }
+  function xf(px, py, pz, rx, ry, rz, sc) { return new T.Matrix4().compose(new T.Vector3(px, py, pz), new T.Quaternion().setFromEuler(new T.Euler(rx || 0, ry || 0, rz || 0)), new T.Vector3(sc || 1, sc || 1, sc || 1)); }
+  var barkTex = canvasTex(128, 256, function (g, w, h) {   // 세로로 갈라진 나무껍질
+    var r = rnd(113); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 260; i++) { g.strokeStyle = 'rgba(0,0,0,' + (0.12 + r() * 0.3) + ')'; g.lineWidth = 1 + r() * 2.5; var x = r() * w, y = r() * h, l = 14 + r() * 50;
+      g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + (r() - 0.5) * 6, y + l * 0.3, x + (r() - 0.5) * 6, y + l * 0.7, x + (r() - 0.5) * 4, y + l); g.stroke(); }
+    for (var k = 0; k < 500; k++) { g.fillStyle = 'rgba(255,255,255,' + r() * 0.12 + ')'; g.fillRect(r() * w, r() * h, 1.5, 2 + r() * 5); }
+  }, [2, 1]);
+  var leafTex = canvasTex(256, 256, function (g, w, h) {   // 잎사귀 뭉치 (밝기만 - 색은 계절 재질이 입힌다)
+    var r = rnd(127); g.clearRect(0, 0, w, h);
+    for (var i = 0; i < 105; i++) {
+      var d = Math.sqrt(r()) * w * 0.43, a = r() * Math.PI * 2, x = w / 2 + Math.cos(a) * d, y = h / 2 + Math.sin(a) * d, l = 22 + r() * 18, t = 150 + Math.floor(r() * 105);
+      g.save(); g.translate(x, y); g.rotate(r() * Math.PI * 2);
+      g.fillStyle = 'rgb(' + t + ',' + t + ',' + t + ')';
+      g.beginPath(); g.moveTo(0, -l / 2); g.quadraticCurveTo(l * 0.36, 0, 0, l / 2); g.quadraticCurveTo(-l * 0.36, 0, 0, -l / 2); g.fill();
+      g.strokeStyle = 'rgba(0,0,0,0.22)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, -l / 2); g.lineTo(0, l / 2); g.stroke();
+      g.restore();
+    }
+  });
+  var needleTex = canvasTex(128, 128, function (g, w, h) {   // 침엽수 잎결 (아래로 처진 바늘잎)
+    var r = rnd(131); g.fillStyle = '#c8c8c8'; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 900; i++) { var t = r(); g.strokeStyle = t < 0.5 ? 'rgba(0,0,0,' + (0.1 + r() * 0.3) + ')' : 'rgba(255,255,255,' + (0.1 + r() * 0.3) + ')'; g.lineWidth = 1;
+      var x = r() * w, y = r() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 5, y + 5 + r() * 12); g.stroke(); }
+  }, [6, 2]);
+  var treeTrunkGeo = (function () {   // 굵은 밑동에서 가늘어지는 줄기 + 수관 속으로 뻗는 가지 넷
+    var parts = [[new T.CylinderGeometry(0.11, 0.21, 3.0, 9, 3), xf(0, 1.5, 0)], [new T.CylinderGeometry(0.2, 0.3, 0.25, 9), xf(0, 0.1, 0)]];
+    [[0.5, 0.7, 0.0], [-0.55, 0.6, 2.1], [0.45, -0.65, 4.2], [-0.3, -0.5, 1.0]].forEach(function (b, i) {
+      var len = 1.5 + i * 0.12; parts.push([new T.CylinderGeometry(0.035, 0.085, len, 6), xf(Math.sin(b[2]) * 0.38, 2.75 + i * 0.12, Math.cos(b[2]) * 0.38, b[0], b[2], b[1])]);
+    });
+    return mergeGeos(parts);
+  })();
+  var pineTreeGeo = (function () {   // 여섯 층: 끝이 들쭉날쭉하고 아래로 처진 가지 치마
+    var parts = [];
+    for (var k = 0; k < 6; k++) {
+      var rad = 1.55 - k * 0.24, hgt = 1.5 - k * 0.08, gq = new T.ConeGeometry(rad, hgt, 16, 2, true), p = gq.attributes.position;
+      for (var i = 0; i < p.count; i++) {
+        var y = p.getY(i), x = p.getX(i), z = p.getZ(i), rr = Math.hypot(x, z);
+        if (y < -hgt / 2 + 0.01 && rr > 0.01) { var a = Math.atan2(z, x), j = (Math.round(a / (Math.PI * 2) * 16) % 2) ? 1.0 : 0.72; p.setXYZ(i, x * j, y - (j > 0.9 ? 0.22 : 0), z * j); }
+        else if (rr > 0.01 && y < hgt / 2 - 0.01) p.setXYZ(i, x * 1.12, y, z * 1.12);   // 가운데 고리를 살짝 부풀림
+      }
+      gq.computeVertexNormals();
+      parts.push([gq, xf(0, 1.6 + k * 0.82 + hgt / 2, 0, 0, k * 0.7, 0)]);
+    }
+    return mergeGeos(parts);
+  })();
+  var pineTrunkGeo = new T.CylinderGeometry(0.1, 0.2, 2.4, 8); pineTrunkGeo.translate(0, 1.2, 0); pineTrunkGeo.userData.shared = true;
+  var leafCardGeo = new T.PlaneGeometry(1, 1); leafCardGeo.userData.shared = true;
+  M.trunk.map = barkTex; M.leafCard.forEach(function (m) { m.map = leafTex; });   // 그림은 재질보다 뒤에 만들어지므로 여기서 잇는다
+  function leafCards(list, mat) {   // [x, y, z, 크기, 회전 셋] 여러 장을 InstancedMesh 하나로
+    if (!list.length) return;
+    var im = new T.InstancedMesh(leafCardGeo, mat, list.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), v = new T.Vector3(), sc = new T.Vector3();
+    list.forEach(function (c, i) { e.set(c[4], c[5], c[6]); q.setFromEuler(e); m4.compose(v.set(c[0], c[1], c[2]), q, sc.set(c[3], c[3], 1)); im.setMatrixAt(i, m4); });
+    im.frustumCulled = false; parent.add(im);
+  }
   // ── 창밖 풍경 상태: 시간(낮·노을·밤) × 계절(봄·여름·가을·겨울) × 날씨(맑음·흐림·비·눈), 각각 자동 가능 ──
   var OUTSIDE = { time: 'auto', season: 'auto', weather: 'clear' };   // 설정값 (lib3d.json outside)
   var OUT = null;                                                       // 지금 적용된 실제 값
@@ -557,7 +631,7 @@
     // 바깥 물체는 실내 조명을 같이 받으므로 시간·날씨만큼 색을 어둡게 한다 (밤에는 켜진 창·가로등만 밝게)
     var f = night ? 0.13 : dusk ? 0.7 : grey ? 0.8 : 1;
     function tint(m, hex) { m.color.setHex(hex).multiplyScalar(f); }
-    var lc = SEASON_LEAF[o.season]; M.leaf.forEach(function (m, i) { tint(m, lc[i]); });
+    var lc = SEASON_LEAF[o.season]; M.leaf.forEach(function (m, i) { tint(m, lc[i]); }); M.leafCard.forEach(function (m, i) { tint(m, lc[i]); m.color.multiplyScalar(1.12); }); M.leafCore.forEach(function (m, i) { tint(m, lc[i]); m.color.multiplyScalar(0.5); });
     tint(M.grass, winter ? 0xf4f7fa : o.season === 'autumn' ? 0xd8c690 : 0xffffff);
     M.grass.map = winter ? null : grassTex; M.grass.needsUpdate = true;
     var wet = o.weather === 'rain';
@@ -574,7 +648,7 @@
     M.lightPool.opacity = night ? 1 : dusk ? 0.5 : 0;
     // 바깥 재질은 실내 반사광을 시간에 맞춰 줄인다 (밤에 실내 빛이 바깥 유리·벽에 비치지 않게)
     var envOut = night ? 0.02 : dusk ? 0.12 : 0.25;
-    [].concat(M.leaf, M.facade, M.awning, CAR.paint, [M.grass, M.pave, M.road, M.trunk, M.pole, M.shopGlass, M.parapet, CAR.glass, CAR.tire])
+    [].concat(M.leaf, M.leafCard, M.leafCore, M.facade, M.awning, CAR.paint, [M.grass, M.pave, M.road, M.trunk, M.pole, M.shopGlass, M.parapet, CAR.glass, CAR.tire])
       .forEach(function (m) { m.envMapIntensity = envOut; m.userData.envSet = true; });
     M.shopGlass.emissive.setHex(night ? 0x1c1208 : dusk ? 0x120c05 : 0x000000);   // 빛 세기는 선형값이라 아주 어둡게 줘야 은은하다
     CAR.head.emissive.setHex(night || dusk || grey ? 0xfff6dd : 0x000000); CAR.tail.emissive.setHex(night || dusk || grey ? 0xff2a1a : 0x000000);
@@ -971,7 +1045,7 @@
     add(pano, 0, EYE - 110 * 0.3 + 110 / 2, cz);   // 그림의 지평선(아래에서 30%)을 눈높이에 맞춘다
     pano.rotation.y = floorIdx * 1.3; pano.renderOrder = -10;
     var LP = loopOf(w, back, front), len = LP.z1 - LP.z0 + 8, lcz = (LP.z0 + LP.z1) / 2;   // 길은 순환 도로 끝까지만
-    var r2 = rnd(977 + floorIdx), Lp = [], Lm = [], La = [];   // 건물 장식(난간 돌·어두운 쇠·밝은 설비) - 한꺼번에 그린다
+    var r2 = rnd(977 + floorIdx), Lp = [], Lm = [], La = [], LEAFC = [[], [], [], []];   // 건물 장식(난간 돌·어두운 쇠·밝은 설비) - 한꺼번에 그린다
     var signed = { gallery: false, jazz: false, office: false, next: 0 };
     BANNER_B = null; bannerMesh = null; SHOPS = {};
     [1, -1].forEach(function (side) {
@@ -982,12 +1056,19 @@
       for (var tz = back - 40; tz < front + 40; tz += 7 + r() * 3) {   // 가로수 (양쪽 보도)
         if (tz > rz0 - 2.5 && tz < rz1 + 2.5) continue;   // 다리 위에는 심지 않는다
         [walkX + side * 1.4, farWalkX - side * 1.4].forEach(function (tx) {
-          var trunk = new T.Mesh(trunkGeo, M.trunk); add(trunk, tx, gy + 1.3, tz);
-          var ch = gy + 3.4 + r() * 0.5;
-          for (var cc = 0; cc < 5; cc++) {   // 잎 덩어리 여러 개를 겹쳐 나무 윤곽을 울퉁불퉁하게
-            var crown = new T.Mesh(crownGeo, M.leaf[Math.floor(r() * M.leaf.length)]), sz = cc ? 0.5 + r() * 0.25 : 0.85;
-            crown.scale.set(sz * (1 + r() * 0.3), sz * (1 + r() * 0.4), sz * (1 + r() * 0.3)); crown.rotation.set(r() * 3, r() * 3, 0);
-            add(crown, tx + (cc ? (r() - 0.5) * 1.8 : 0), ch + (cc ? (r() - 0.3) * 1.4 : 0), tz + (cc ? (r() - 0.5) * 1.8 : 0));
+          var ts = 0.9 + r2() * 0.35, li = Math.floor(r2() * 4);
+          var trunk = new T.Mesh(treeTrunkGeo, M.trunk); trunk.scale.setScalar(ts); trunk.rotation.y = r2() * 6; add(trunk, tx, gy, tz);
+          var ch = gy + (3.7 + r() * 0.4) * ts;
+          for (var cc = 0; cc < 4; cc++) {   // 속을 채우는 어두운 잎 덩어리
+            var crown = new T.Mesh(crownGeo, M.leafCore[(li + cc) % 4]), sz = (cc ? 0.38 + r() * 0.14 : 0.5) * ts;
+            crown.scale.set(sz * (1 + r() * 0.3), sz * (1 + r() * 0.3), sz * (1 + r() * 0.3)); crown.rotation.set(r() * 3, r() * 3, 0);
+            add(crown, tx + (cc ? (r() - 0.5) * 1.5 : 0) * ts, ch + (cc ? (r() - 0.3) * 1.1 : 0.35) * ts, tz + (cc ? (r() - 0.5) * 1.5 : 0) * ts);
+          }
+          for (var pad = 0; pad < 14; pad++) r();   // 예전과 같은 수만큼 난수를 써서 건물 배치가 바뀌지 않게
+          for (var lc = 0; lc < 150; lc++) {   // 겉을 덮는 잎사귀 뭉치 (위쪽은 넓게, 아래쪽은 성기게)
+            var u = r2() * 2 - 0.45, th = r2() * Math.PI * 2, hr = Math.sqrt(Math.max(0, 1 - Math.min(1, u * u))), rad = (0.8 + r2() * 0.3) * ts;
+            if (u > 1) { u = 1; hr = r2() * 0.5; }
+            LEAFC[(li + (lc % 3 === 0 ? 1 : 0)) % 4].push([tx + Math.cos(th) * hr * 2.0 * rad, ch + u * 1.55 * rad, tz + Math.sin(th) * hr * 2.0 * rad, (1.0 + r2() * 0.8) * ts, r2() * 3, r2() * 6, r2() * 3]);
           }
         });
       }
@@ -1061,6 +1142,7 @@
       }
     });
     instBoxes(Lp, M.parapet); instBoxes(Lm, M.pole); instBoxes(La, CAMP.cooler);
+    LEAFC.forEach(function (l, i) { leafCards(l, M.leafCard[i]); });
     // 순환 도로의 앞길(캠핑장 뒤)·뒷길(서재 뒤) + 모퉁이
     [LP.z0, LP.z1].forEach(function (rz) {
       var cr = new T.Mesh(new T.PlaneGeometry(8, 2 * LP.hx + 8), M.road); cr.rotation.set(-Math.PI / 2, 0, Math.PI / 2); add(cr, 0, gy + 0.024, rz);   // 양옆 보도보다 살짝 위 (찻길이 보도에 덮이지 않게)
@@ -1121,7 +1203,7 @@
     lamp: new T.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0x000000, emissiveIntensity: 2.2, roughness: 0.4 }),
     flame: new T.MeshBasicMaterial({ color: 0xffa23a, transparent: true, opacity: 0.9, fog: false }),
     stone: new T.MeshStandardMaterial({ color: 0x6f6b66, roughness: 1, flatShading: true }),
-    pine: [0x2f5a3c, 0x3a6a45, 0x274d35].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }); }),
+    pine: [0x2f5a3c, 0x3a6a45, 0x274d35].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 1, map: needleTex, side: T.DoubleSide }); }),
     hammock: new T.MeshStandardMaterial({ color: 0x3b6fb0, roughness: 0.9, side: T.DoubleSide }),
     chair: new T.MeshStandardMaterial({ color: 0x4a5a48, roughness: 0.9 }),
     cooler: new T.MeshStandardMaterial({ color: 0xd9e4ea, roughness: 0.6 }),
@@ -1194,8 +1276,8 @@
     // 먼 산 (경치 그림 바로 앞의 큰 판) + 캠핑장 뒤 침엽수 숲
     var fuji = new T.Mesh(new T.PlaneGeometry(250, 82), CAMP.fuji); fuji.rotation.y = Math.PI; add(fuji, 0, gy + 41 - 3, farZ);
     function pine(x, z, s) {
-      ubox(0.3 * s, 1.2 * s, 0.3 * s, M.trunk, x, gy + 0.6 * s, z);
-      for (var k = 0; k < 3; k++) { var c = new T.Mesh(pineGeo, CAMP.pine[Math.floor(r() * 3)]); c.scale.set((1.5 - k * 0.38) * s, 1.9 * s, (1.5 - k * 0.38) * s); c.rotation.y = r() * 6; add(c, x, gy + (1.8 + k * 1.15) * s, z); }
+      var tr = new T.Mesh(pineTrunkGeo, M.trunk); tr.scale.setScalar(s * 0.8); add(tr, x, gy, z);
+      var pn = new T.Mesh(pineTreeGeo, CAMP.pine[Math.floor(r() * 3)]); pn.scale.set(s * (0.72 + r() * 0.16), s * (0.74 + r() * 0.2), s * (0.72 + r() * 0.16)); pn.rotation.y = r() * 6; add(pn, x, gy - 0.3 * s, z);
     }
     for (var fx = -SCENE_R + 10; fx < SCENE_R - 10; fx += 3.2 + r() * 2.5) pine(fx, campZ1 + 13 + r() * 10, 1.3 + r() * 1.5);
     [1, -1].forEach(function (side) {   // 강 건너 길 바깥쪽도 숲
