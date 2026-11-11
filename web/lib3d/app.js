@@ -1830,6 +1830,84 @@
     [-1, 1].forEach(function (o) { var lg = new T.Mesh(unitBox, M.black); lg.scale.set(0.45, 0.42, 0.06); lg.position.set(0, 0.21, o * 1.05); bn.add(lg); });
     [-0.6, 0.6].forEach(function (o) { addSeat(R.bx + s * 0.4, z + o, s * Math.PI / 2, 0.48); });
   }
+  // ── 픽시브 랭킹 전시관: 길 건너 [픽시브] 설정의 건물 1층 - 랭킹 그림을 벽 액자에, 누르면 픽시브 작품 페이지 (새 탭) ──
+  // 그림은 서버가 그때그때 이어 준다(저장 안 함). 관리자가 켰을 때만, 관람자는 허용했을 때만 보인다.
+  var PIXIV = { enabled: false }, PIXIV_R = null;
+  function addPixivRoom(w) {
+    PIXIV_R = null;
+    var bn = PIXIV.enabled && PIXIV.building, info = bn && SHOPS[bn];
+    if (!info || [STREET.gallery, STREET.jazz, STREET.office].indexOf(bn) >= 0) return;
+    var wallM = new T.MeshStandardMaterial({ color: 0xf1eee8, roughness: 0.95, side: T.DoubleSide });
+    var floorM = new T.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.4 });
+    var R = shopRoom(info, w, { label: bn + ' 픽시브 랭킹 전시관 · 액자를 누르면 픽시브 작품 페이지', wall: wallM, floor: floorM,
+                                sign: ['PIXIV RANKING', bn + ' · ' + (PIXIV.label || '') + ' · 들어오세요'], signBg: '#0096fa', signFg: '#ffffff' });
+    if (!R) return;
+    PIXIV_R = R;
+    var gy = R.gy, z = R.z, H = R.H, bw = R.bw, s = R.s, mine = R;
+    var head = new T.Mesh(new T.PlaneGeometry(4.4, 0.5), new T.MeshBasicMaterial({ map: textTex(['PIXIV RANKING  ·  ' + (PIXIV.label || '')], 1600, 180, '#f1eee8', '#0096fa', 100), toneMapped: false }));
+    head.rotation.y = R.inRot; head.position.set(R.kx - s * 0.02, gy + H - 0.32, z); parent.add(head);
+    var PW = 1.3, PH = 1.5, slots = [];
+    for (var sz = z - bw / 2 + 1.5; sz <= z + bw / 2 - 1.5; sz += 1.95) slots.push([R.kx - s * 0.03, sz, R.inRot]);
+    [-1, 1].forEach(function (sd) { for (var d0 = 1.9; d0 <= R.bd - 1.4; d0 += 1.95) slots.push([R.fx + s * d0, z + sd * (bw / 2 - 0.03), sd > 0 ? Math.PI : 0]); });
+    slots = slots.slice(0, Math.max(4, PIXIV.limit || 24));
+    var bench = new T.Group(); bench.position.set(R.bx + s * 0.4, gy, z); parent.add(bench);
+    var top = new T.Mesh(unitBox, M.oak); top.scale.set(0.55, 0.06, 2.4); top.position.y = 0.45; bench.add(top);
+    [-1, 1].forEach(function (o) { var lg = new T.Mesh(unitBox, M.black); lg.scale.set(0.45, 0.42, 0.06); lg.position.set(0, 0.21, o * 1.05); bench.add(lg); });
+    [-0.6, 0.6].forEach(function (o) { addSeat(R.bx + s * 0.4, z + o, s * Math.PI / 2, 0.48); });
+    function note(text) {   // 그림을 못 받았을 때 안쪽 벽에 이유를
+      var nt = new T.Mesh(new T.PlaneGeometry(5.2, 0.9), new T.MeshBasicMaterial({ map: textTex([text], 1700, 300, '#f1eee8', '#7a2f2f', 62), toneMapped: false }));
+      nt.rotation.y = R.inRot; nt.position.set(R.kx - s * 0.04, gy + 1.7, z); parent.add(nt);
+    }
+    var group = parent;
+    api('api/lib3d/pixiv/list').then(function (d) {
+      if (PIXIV_R !== mine || !group.parent && group !== scene) return;   // 그 사이 층을 다시 지었으면 그만
+      (d.items || []).slice(0, slots.length).forEach(function (it, i) {
+        var sl = slots[i], g = new T.Group(); g.position.set(sl[0], gy + 1.62, sl[1]); g.rotation.y = sl[2]; group.add(g);
+        var back = new T.Mesh(unitBox, M.black); back.scale.set(PW + 0.1, PH + 0.1, 0.04); back.position.z = 0.02; g.add(back);
+        var mount = new T.Mesh(unitBox, galWall); mount.scale.set(PW, PH, 0.01); mount.position.z = 0.045; g.add(mount);
+        var mat = new T.MeshBasicMaterial({ color: 0xdedad2, toneMapped: false });
+        var m = new T.Mesh(posterGeo, mat); m.scale.set(PW - 0.1, PH - 0.1, 1); m.position.z = 0.052; m.userData.pixiv = it.url; g.add(m); brunchHits.push(m);
+        var cap = new T.Mesh(new T.PlaneGeometry(PW + 0.1, 0.24), new T.MeshBasicMaterial({ map: textTex(['#' + it.rank + '  ' + (it.title || '(제목 없음)'), it.author || ''], 640, 120, '#f1eee8', '#2a2c30', 34), toneMapped: false }));
+        cap.position.set(0, -PH / 2 - 0.2, 0.03); g.add(cap);
+        var lamp = new T.Mesh(unitBox, EXT.metal); lamp.scale.set(0.5, 0.05, 0.12); lamp.position.set(0, PH / 2 + 0.2, 0.18); g.add(lamp);
+        loader.load('api/lib3d/pixiv/img?u=' + encodeURIComponent(it.thumb), function (tex) {
+          tex.encoding = T.sRGBEncoding; tex.anisotropy = 8;
+          var iw = tex.image && tex.image.width || 1, ih = tex.image && tex.image.height || 1, k = Math.min((PW - 0.1) / iw, (PH - 0.1) / ih);   // 잘리지 않게 액자 안에 맞춘다
+          m.scale.set(iw * k, ih * k, 1); mat.map = tex; mat.color.set(0xffffff); mat.needsUpdate = true;
+        }, undefined, function () { mat.color.set(0xb9b4aa); });
+      });
+      if (!(d.items || []).length) note(d.error || '보여 줄 그림이 없습니다');
+    }).catch(function (e) { if (PIXIV_R === mine) note(e.message || '픽시브 랭킹을 받지 못했습니다'); });
+  }
+  // [픽시브] 설정: 건물·랭킹·보일 사람·로그인 쿠키
+  function pixivForm() {
+    if (!el('l3d-px-on')) return;
+    var P0 = PIXIV || {};
+    el('l3d-px-on').checked = !!P0.on; el('l3d-px-viewers').checked = !!P0.viewers; el('l3d-px-safe').checked = P0.safe !== false;
+    el('l3d-px-limit').value = P0.limit || 24;
+    el('l3d-px-cookie').value = ''; el('l3d-px-cookie').placeholder = P0.cookie_set ? '저장됨 - 바꿀 때만 입력' : '없음 (넣어야 그림이 나옵니다)';
+    var used = [STREET.gallery, STREET.jazz, STREET.office], names = (STREET.signs || []).filter(function (n) { return used.indexOf(n) < 0; });
+    if (P0.building && names.indexOf(P0.building) < 0) names.unshift(P0.building);
+    function fill(sel, rows, val) { sel.textContent = ''; rows.forEach(function (r) { var o = document.createElement('option'); o.value = r[0]; o.textContent = r[1]; sel.appendChild(o); }); sel.value = val; }
+    fill(el('l3d-px-building'), names.map(function (n) { return [n, n + (SHOPS[n] ? '' : ' (지금 거리에 없음)')]; }), P0.building || '');
+    fill(el('l3d-px-content'), P0.contents || [], P0.content || 'illust');
+    function modes() { var ok = (P0.content_modes || {})[el('l3d-px-content').value] || []; fill(el('l3d-px-mode'), (P0.modes || []).filter(function (m) { return ok.indexOf(m[0]) >= 0; }), ok.indexOf(P0.mode) >= 0 ? P0.mode : 'daily'); }
+    modes(); el('l3d-px-content').onchange = modes;
+    if (P0.error) el('l3d-out-msg').textContent = '픽시브: ' + P0.error;
+  }
+  function pixivSave(extra) {
+    var body = Object.assign({ enabled: el('l3d-px-on').checked, building: el('l3d-px-building').value, content: el('l3d-px-content').value, mode: el('l3d-px-mode').value,
+                               limit: parseInt(el('l3d-px-limit').value, 10) || 24, viewers: el('l3d-px-viewers').checked, safe: el('l3d-px-safe').checked,
+                               phpsessid: el('l3d-px-cookie').value.trim() }, extra || {});
+    el('l3d-out-msg').textContent = '저장 중...';
+    postJSON('api/lib3d/settings', { pixiv: body }).then(function (d) {
+      PIXIV = d.pixiv; pixivForm();
+      el('l3d-out-msg').textContent = '픽시브 설정을 저장했습니다.' + (PIXIV.on && !PIXIV.cookie_set ? ' 로그인 쿠키를 넣어야 그림이 나옵니다.' : ' 1층에서 다시 지어 바로 보여 줍니다.');
+      if (cur === 0) buildFloor(0);
+    }).catch(function (e) { el('l3d-out-msg').textContent = e.message; });
+  }
+  el('l3d-px-save').addEventListener('click', function () { pixivSave(); });
+  el('l3d-px-clear').addEventListener('click', function () { pixivSave({ phpsessid: '', clear_cookie: true }); });
   // ── 재즈 청음실: 길 건너 [거리] 설정의 청음실 건물 1층 - 스피커·앰프·턴테이블·LP 선반·네온, 벽 화면에 지금 곡과 스펙트럼 ──
   // 인터넷 재즈 라디오 3곳(colaiuta77/jazzradio 참고)을 서버가 이어 준다. 소리는 고른 사람에게만, 청음실에서 멀어질수록 작아진다.
   var JZ = { room: null, audio: null, ctx: null, an: null, gain: null, data: null, st: '', playing: false, vol: 0.8, now: null, bars: null, platter: null,
@@ -2148,6 +2226,7 @@
     addGallery(w);               // 길 건너 갤러리 ([거리] 설정)
     addJazzRoom(w);              // 길 건너 재즈 청음실 ([거리] 설정)
     addOffice(w);                // 길 건너 왼쪽 사무실 ([거리] 설정)
+    addPixivRoom(w);             // 길 건너 픽시브 랭킹 전시관 ([픽시브] 설정)
     // 안쪽·바깥 매트
     [front - 1.1, front + 1.1].forEach(function (mz) { var mat = new T.Mesh(new T.PlaneGeometry(3.2, 1.6), new T.MeshStandardMaterial({ color: 0x2b2d30, roughness: 1 })); mat.rotation.x = -Math.PI / 2; add(mat, 0, 0.015, mz); });
     // 앞마당 (보도블록) - 양옆 보도와 이어진다
@@ -3715,6 +3794,7 @@
     var hit = ray.intersectObjects(targets, false)[0];
     if (hit && hit.object === elevator && hit.distance < 8) { openFloors(); return; }
     if (hit && hit.object.userData.cinema && hit.distance < 40) { closeCard(); openCinema(true); return; }
+    if (hit && hit.object.userData.pixiv && hit.distance < 12) { window.open(hit.object.userData.pixiv, '_blank', 'noopener'); return; }
     if (hit && hit.object.userData.jazz && hit.distance < 12) { openJazz(); return; }
     if (hit && hit.object.userData.arcade && hit.distance < 10) { openArcade(hit.object.userData.arcade); return; }
     if (hit && hit.object.userData.brunch && hit.distance < 14) { closeCard(); openBrunch(); return; }
@@ -4200,7 +4280,7 @@
     el('l3d-out-time').value = OUTSIDE.time; el('l3d-out-season').value = OUTSIDE.season; el('l3d-out-weather').value = OUTSIDE.weather;
     el('l3d-out-city').value = OUTSIDE.city || '광주';
     el('l3d-out-msg').textContent = cityWeatherText();
-    streetForm();
+    streetForm(); pixivForm();
   }
   // [거리]: 길 건너 간판 이름과 갤러리·청음실·사무실·현수막 건물
   function streetForm() {
@@ -4472,7 +4552,7 @@
   el('l3d-cfg-x').addEventListener('click', cfgClose);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cfgBox.classList.contains('on')) { e.stopPropagation(); cfgClose(); } }, true);
   subTabs(aiBox.querySelector('.body'), ['연결', '기능', '도구']);
-  subTabs(outBox.querySelector('.body'), ['풍경', '거리', '현수막']);
+  subTabs(outBox.querySelector('.body'), ['풍경', '거리', '현수막', '픽시브']);
   function hashNav() {
     if (ME && ME.role === 'viewer') return;
     var tab = { '#settings': 0, '#ai': 1, '#people': 2, '#outside': 3, '#models': 4, '#staff': 5 }[location.hash];
@@ -4661,6 +4741,7 @@
         floors = makeFloors(libs);
         ARCADE = d.arcade || [];
         if (d.street) STREET = d.street;
+        if (d.pixiv) PIXIV = d.pixiv;
         YMPLAYER = d.ymplayer || ''; YM_EMBED = d.ymplayer_embed || 'auto'; YMPROXY = !!d.ymproxy;
         if (YMPLAYER || YMPROXY) floors.push({ key: 'cinema', label: (floors.length + 1) + '층 영화관', libs: [], total: 0, booths: [], cinema: true });
         floors.forEach(function (f, i) {

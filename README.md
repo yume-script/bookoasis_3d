@@ -58,6 +58,7 @@ boa3d/lib3d_jazz.py         재즈 청음실 (인터넷 재즈 라디오 중계)
 boa3d/lib3d_ymp.py          영화관 (YMPlayer IPTV·텔레그램 중계)
 boa3d/lib3d_discord.py      디스코드 채널 연동 (웹후크 보내기, 봇 토큰으로 받기)
 boa3d/lib3d_activity.py     서재 소식 (접속·읽기·재생 알림)
+boa3d/lib3d_pixiv.py        픽시브 랭킹 전시관 (랭킹 받기·그림 중계)
 web/lib3d/                  3D 화면 (index.html, app.js - three.js r128)
 web/shell.js, theme.css     화면 틀(사이드바·테마·계정), login.*
 mini/                       오락실 미니게임 (ym_mini_game)

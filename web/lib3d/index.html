@@ -457,6 +457,21 @@
           </div>
           <div class="row"><button type="button" class="l3d-btn primary" id="l3d-st-save">거리 저장</button></div>
         </section>
+        <section class="card" data-sub="픽시브">
+          <p class="sub">길 건너 건물 1층에 <b>픽시브 랭킹 전시관</b>을 엽니다. 랭킹 그림을 벽 액자에 걸고, 액자를 누르면 픽시브 작품 페이지가 새 탭으로 열립니다. 그림은 저장하지 않고 그때그때 받아 옵니다. 성인(R-18) 랭킹과 R-18 작품은 걸지 않습니다.</p>
+          <label class="f chk"><input type="checkbox" id="l3d-px-on"> 픽시브 전시관 열기</label>
+          <div class="grid2">
+            <label class="f">전시관 건물 <select id="l3d-px-building"></select></label>
+            <label class="f">그림 수 (4~40) <input type="number" id="l3d-px-limit" min="4" max="40"></label>
+            <label class="f">그림 종류 <select id="l3d-px-content"></select></label>
+            <label class="f">랭킹 <select id="l3d-px-mode"></select></label>
+          </div>
+          <label class="f chk"><input type="checkbox" id="l3d-px-viewers"> 관람자 계정에게도 보이기 (끄면 관리자만)</label>
+          <label class="f chk"><input type="checkbox" id="l3d-px-safe"> 수위 있는 그림 빼기 (픽시브가 표시한 것)</label>
+          <label class="f">픽시브 로그인 쿠키 PHPSESSID <input type="password" id="l3d-px-cookie" autocomplete="new-password" placeholder="없음"></label>
+          <p class="sub">픽시브에 로그인한 브라우저의 개발자 도구 &gt; 저장공간(Application) &gt; 쿠키 &gt; www.pixiv.net의 PHPSESSID 값. 만료되면 다시 넣습니다. 서버의 .env에만 저장하고 화면에는 다시 보여 주지 않습니다.</p>
+          <div class="row"><button type="button" class="l3d-btn primary" id="l3d-px-save">픽시브 저장</button><button type="button" class="l3d-btn" id="l3d-px-clear">쿠키 지우기</button></div>
+        </section>
         <section class="card" data-sub="현수막">
           <label class="f">현수막
             <select id="l3d-out-bmode"><option value="">없음</option><option value="url">그림 주소</option><option value="library">보관함 표지 (무작위로 바뀜)</option></select></label>

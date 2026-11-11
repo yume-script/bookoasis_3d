@@ -26,7 +26,7 @@ import zipfile
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_activity, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_presence, lib3d_ymp
+from . import auth, config, lib3d, lib3d_agents, lib3d_ai, lib3d_activity, lib3d_brunch, lib3d_discord, lib3d_events, lib3d_jazz, lib3d_pixiv, lib3d_presence, lib3d_ymp
 
 log = logging.getLogger("boa3d.web")
 WEB_DIR = os.path.join(config.ROOT, "web")
@@ -334,6 +334,21 @@ class Handler(BaseHTTPRequestHandler):
         from urllib.parse import parse_qs
         if path.startswith("/api/lib3d/jazz/"):   # 재즈 청음실 (인터넷 재즈 라디오 중계)
             return self._jazz(path[len("/api/lib3d/jazz/"):])
+        if path.startswith("/api/lib3d/pixiv/"):   # 픽시브 랭킹 전시관 (관리자가 켠 것만, 관람자는 허용했을 때만)
+            from urllib.parse import parse_qs as _pq
+            if not lib3d_pixiv.allowed(auth.is_admin(user)):
+                return self._send(403, {"success": False, "error": "픽시브 전시관이 꺼져 있거나 볼 수 없는 계정입니다."})
+            try:
+                if path == "/api/lib3d/pixiv/list":
+                    return self._send(200, dict(lib3d_pixiv.public(auth.is_admin(user)), items=lib3d_pixiv.ranking(), success=True))
+                if path == "/api/lib3d/pixiv/img":
+                    raw, ctype = lib3d_pixiv.image((_pq(self.path.partition("?")[2]).get("u") or [""])[0])
+                    return self._send(200, raw, ctype, extra={"Cache-Control": "private, max-age=3600"})
+            except ValueError as e:
+                return self._send(200, {"success": False, "error": str(e)})
+            except Exception as e:  # noqa: BLE001
+                return self._send(502, {"success": False, "error": "픽시브에서 받지 못했습니다: %s" % str(e)[:120]})
+            return self._send(404, {"success": False, "error": "없는 주소입니다."})
         if path == "/api/lib3d/arcade":   # 오락실: 게임 하나만 띄우는 화면 (3D 서재 안 창에 넣음, #게임id)
             if not mods["mini"]:
                 return self._send(404, {"success": False, "error": "미니게임이 꺼져 있습니다 (MINI_ENABLED)."})
@@ -359,6 +374,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, dict(d, ai=ai, me=me, staff_on=staff_on, brunch_on=lib3d_brunch.enabled(),
                                             people=lib3d.load_settings().get("people") or {},
                                             outside=lib3d.load_settings().get("outside") or {},
+                                            pixiv=lib3d_pixiv.public(auth.is_admin(user)),
                                             models=lib3d.load_settings().get("models") or "basic",
                                             banner=lib3d.banner_info(), street=lib3d.street(), ymplayer=lib3d.ymplayer_url(), ymproxy=lib3d_ymp.configured(), arcade=arcade_menu(mods), ymplayer_embed=lib3d.ymplayer_embed(), success=True))
             if path.startswith("/api/lib3d/brunch/"):   # 1층 브런치 연재 낭독 코너 (브런치 공개 글이라 관람자도)
@@ -675,6 +691,11 @@ class Handler(BaseHTTPRequestHandler):
             if "street" in context and "libraries" not in context:   # 거리 간판·특별한 건물 이름
                 try:
                     return self._send(200, {"success": True, "street": lib3d.save_street(context["street"] if isinstance(context["street"], dict) else {})})
+                except ValueError as e:
+                    return self._send(400, {"success": False, "error": str(e)})
+            if "pixiv" in context and "libraries" not in context:   # 픽시브 전시관 설정 (건물·랭킹·보일 사람·쿠키)
+                try:
+                    return self._send(200, {"success": True, "pixiv": lib3d_pixiv.save(context["pixiv"] if isinstance(context["pixiv"], dict) else {})})
                 except ValueError as e:
                     return self._send(400, {"success": False, "error": str(e)})
             if "models" in context and "libraries" not in context:   # 3D 모형 선택만 저장

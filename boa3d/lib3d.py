@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 
 from . import bookoasis_db, config
 
-VERSION = "2.60.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
+VERSION = "2.61.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
 CACHE_SEC = 300
 COVER_WIDTH = 200
 _DATA = {"at": 0.0, "v": None}
@@ -152,6 +152,17 @@ def save_outside(outside):
         json.dump(data_, f, ensure_ascii=False, indent=2)
     os.replace(tmp, _settings_path())
     return clean
+
+
+def save_setting(key, value):
+    """lib3d.json의 한 항목만 바꿔 저장"""
+    data_ = dict(load_settings(), **{key: value})
+    os.makedirs(config.data_dir(), exist_ok=True)
+    tmp = _settings_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data_, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, _settings_path())
+    return value
 
 
 def save_models(value):
