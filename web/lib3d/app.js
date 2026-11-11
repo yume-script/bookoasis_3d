@@ -490,14 +490,16 @@
     im.frustumCulled = false; parent.add(im);
   }
   // ── 창밖 풍경 상태: 시간(낮·노을·밤) × 계절(봄·여름·가을·겨울) × 날씨(맑음·흐림·비·눈), 각각 자동 가능 ──
-  var OUTSIDE = { time: 'auto', season: 'auto', weather: 'clear' };   // 설정값 (lib3d.json outside)
+  var OUTSIDE = { time: 'auto', season: 'auto', weather: 'clear', city: '광주' };   // 설정값 (lib3d.json outside). city = 날씨 기준 도시
+  var CITY_W = null;   // 기준 도시의 지금 날씨 { city, weather, text, temp } (서버가 Open-Meteo에서 받아 15분 보관)
   var OUT = null;                                                       // 지금 적용된 실제 값
   function resolveOutside() {
     var now = new Date(), hr = now.getHours() + now.getMinutes() / 60, mo = now.getMonth() + 1;
     var time = OUTSIDE.time !== 'auto' ? OUTSIDE.time : (hr >= 6.5 && hr < 17 ? 'day' : hr >= 17 && hr < 19 ? 'dusk' : 'night');
     var season = OUTSIDE.season !== 'auto' ? OUTSIDE.season : (mo >= 3 && mo <= 5 ? 'spring' : mo >= 6 && mo <= 8 ? 'summer' : mo >= 9 && mo <= 11 ? 'autumn' : 'winter');
     var weather = OUTSIDE.weather;
-    if (weather === 'auto') {   // 날마다 바뀌는 날씨 (겨울은 눈, 여름은 비가 잦게)
+    if (weather === 'auto' && CITY_W && CITY_W.weather) weather = CITY_W.weather;   // 기준 도시의 실제 날씨
+    if (weather === 'auto') {   // 못 받았으면: 날마다 바뀌는 날씨 (겨울은 눈, 여름은 비가 잦게)
       var d = Math.floor(now.getTime() / 86400000), x = ((d * 9301 + 49297) % 233280) / 233280;
       weather = x < 0.55 ? 'clear' : x < 0.75 ? 'cloudy' : season === 'winter' ? 'snow' : 'rain';
     }
@@ -676,6 +678,14 @@
     }
   }
   setInterval(function () { applyOutside(); }, 60000);   // 자동(시간·계절·날씨)이면 1분마다 확인
+  function cityWeatherText() { return CITY_W && CITY_W.city ? CITY_W.city + ' 지금: ' + (CITY_W.weather ? CITY_W.text + (CITY_W.temp != null ? ' ' + CITY_W.temp + '°C' : '') : (CITY_W.text || '날씨를 받지 못했습니다') + ' (날마다 바뀌는 날씨로 대신)') : ''; }
+  function loadCityWeather(show) {   // 기준 도시의 실제 날씨 (자동 날씨에 쓴다)
+    return api('api/lib3d/weather').then(function (d) {
+      CITY_W = d; applyOutside();
+      if (show && el('l3d-out-msg')) el('l3d-out-msg').textContent = cityWeatherText();
+    }).catch(function () { /* 못 받으면 날마다 바뀌는 날씨 */ });
+  }
+  setInterval(function () { loadCityWeather(false); }, 15 * 60000);
   // 바깥 건물용 환경 조명: 실제 하늘을 찍은 HDR 그림(three.js 예제의 royal_esplanade_1k.hdr, Poly Haven CC0)을 받아 반사에 쓴다.
   // 못 받으면 예전처럼 실내 환경 조명으로 비친다. 서재 안 재질에는 쓰지 않는다.
   var OUT_ENV = null, OUT_ENV_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r175/examples/textures/equirectangular/royal_esplanade_1k.hdr';
@@ -4188,7 +4198,8 @@
     el('l3d-out-banner').value = BANNER.url || '';
     el('l3d-out-bmode').value = BANNER.mode || ''; el('l3d-out-banner-sec').value = BANNER.sec || 30; bannerModeUI(); bannerLibs();
     el('l3d-out-time').value = OUTSIDE.time; el('l3d-out-season').value = OUTSIDE.season; el('l3d-out-weather').value = OUTSIDE.weather;
-    el('l3d-out-msg').textContent = '';
+    el('l3d-out-city').value = OUTSIDE.city || '광주';
+    el('l3d-out-msg').textContent = cityWeatherText();
     streetForm();
   }
   // [거리]: 길 건너 간판 이름과 갤러리·청음실·사무실·현수막 건물
@@ -4208,13 +4219,14 @@
       if (cur === 0) buildFloor(0);
     }).catch(function (e) { el('l3d-out-msg').textContent = e.message; });
   });
-  function outsideForm() { return { time: el('l3d-out-time').value, season: el('l3d-out-season').value, weather: el('l3d-out-weather').value }; }
+  function outsideForm() { return { time: el('l3d-out-time').value, season: el('l3d-out-season').value, weather: el('l3d-out-weather').value, city: el('l3d-out-city').value.trim() || '광주' }; }
   ['l3d-out-time', 'l3d-out-season', 'l3d-out-weather'].forEach(function (id) {
     el(id).addEventListener('change', function () { OUTSIDE = outsideForm(); applyOutside.force = true; applyOutside(); el('l3d-out-msg').textContent = '미리 보기 중 - 저장해야 남습니다.'; });
   });
   el('l3d-out-save').addEventListener('click', function () {
     postJSON('api/lib3d/settings', { outside: outsideForm() }).then(function (d) {
       OUTSIDE = d.outside; applyOutside.force = true; applyOutside(); el('l3d-out-msg').textContent = '저장했습니다.';
+      loadCityWeather(false).then(function () { applyOutside.force = true; applyOutside(); el('l3d-out-msg').textContent = '저장했습니다. ' + cityWeatherText(); });   // 도시가 바뀌었으면 새 날씨로
     }).catch(function (e) { el('l3d-out-msg').textContent = e.message; });
   });
   el('l3d-out-close').addEventListener('click', function () { outBox.classList.remove('on'); });
@@ -4644,7 +4656,8 @@
         PEOPLE = d.people || {};
         MODELS = d.models === 'real' ? 'real' : 'basic'; loadReal();
         if (d.banner) { BANNER = d.banner; if (el('l3d-out').classList.contains('on')) openOutside(); }
-        if (d.outside) OUTSIDE = Object.assign({ time: 'auto', season: 'auto', weather: 'clear' }, d.outside);
+        if (d.outside) OUTSIDE = Object.assign({ time: 'auto', season: 'auto', weather: 'clear', city: '광주' }, d.outside);
+        if (!CITY_W) loadCityWeather(false);
         floors = makeFloors(libs);
         ARCADE = d.arcade || [];
         if (d.street) STREET = d.street;

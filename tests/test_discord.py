@@ -133,6 +133,32 @@ class DiscordTest(unittest.TestCase):
         self.assertNotIn("librarian", ag.roam_tick(9000.0, random.Random(4)))   # 업무 중이면 안 움직인다
         ag._WORKING.discard("librarian")
 
+    def test_weather_city(self):
+        from boa3d import lib3d, lib3d_ai
+        self.assertEqual(lib3d.weather_city(), "광주")                       # 기준값
+        self.assertEqual(lib3d.save_outside({"weather": "auto", "city": " 부산 "})["city"], "부산")
+        self.assertEqual(lib3d.weather_city(), "부산")
+        asked = []
+
+        def fake(url, timeout=15):
+            asked.append(url)
+            if "geocoding" in url:
+                return {"results": [{"latitude": 35.1, "longitude": 129.0, "name": "부산", "country": "대한민국"}]} if "Busan" in url else {}
+            return {"current": {"temperature_2m": 7.5, "weather_code": 63}, "daily": {"time": []}}
+        self.addCleanup(setattr, lib3d_ai, "_get_json", lib3d_ai._get_json)
+        lib3d_ai._get_json = fake
+        lib3d_ai._CITY_W.clear()
+        w = lib3d_ai.city_weather()
+        self.assertEqual((w["city"], w["weather"], w["temp"]), ("부산", "rain", 7.5))
+        n = len(asked)
+        lib3d_ai.city_weather()
+        self.assertEqual(len(asked), n)                                       # 15분 동안은 다시 묻지 않는다
+        self.assertIn("부산", lib3d_ai._tool_weather({}))                     # AI 날씨 도구도 기준 도시로
+        self.assertEqual([lib3d_ai._sky(c) for c in (0, 3, 61, 73)], ["clear", "cloudy", "rain", "snow"])
+        self.assertEqual(lib3d_ai.city_weather("없는곳")["weather"], "")
+        lib3d.save_outside({"weather": "clear"})
+        self.assertEqual(lib3d.weather_city(), "광주")
+
     def test_thread_id_in_webhook_url(self):
         for tail in ("?thread_id=555", "&thread_id=555", "?wait=true&thread_id=555"):
             os.environ["LIB3D_DISCORD_WEBHOOK_URL"] = HOOK + tail

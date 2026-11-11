@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 
 from . import bookoasis_db, config
 
-VERSION = "2.57.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
+VERSION = "2.58.0"   # bookoasis_3d (BookOasis Assistant 2.49.0의 3D 서재에서 떼어냄)
 CACHE_SEC = 300
 COVER_WIDTH = 200
 _DATA = {"at": 0.0, "v": None}
@@ -132,9 +132,16 @@ OUTSIDE_CHOICES = {"time": ("auto", "day", "dusk", "night"), "season": ("auto", 
                    "weather": ("auto", "clear", "cloudy", "rain", "snow")}
 
 
+DEFAULT_CITY = "광주"   # 날씨 기준 도시 (자동 날씨·AI의 날씨 도구) - [설정 > 창밖 풍경]에서 바꾼다
+
+
+def weather_city():
+    return str((load_settings().get("outside") or {}).get("city") or DEFAULT_CITY)
+
+
 def save_outside(outside):
-    """창밖 풍경 {"time", "season", "weather"} 저장 (모르는 값은 기본값으로)"""
-    clean = {}
+    """창밖 풍경 {"time", "season", "weather", "city"} 저장 (모르는 값은 기본값으로). city = 날씨 기준 도시"""
+    clean = {"city": " ".join(str((outside or {}).get("city") or "").split())[:40] or DEFAULT_CITY}
     for key, choices in OUTSIDE_CHOICES.items():
         value = str((outside or {}).get(key) or "")
         clean[key] = value if value in choices else ("clear" if key == "weather" else "auto")

@@ -610,7 +610,7 @@ _WMO = {0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림", 45:
 BUILTIN_TOOLS = [
     {"name": "now", "description": "지금 날짜·시각·요일 (서버 시간대). 오늘·내일·요일이 필요한 질문에 쓴다.",
      "inputSchema": {"type": "object", "properties": {}}},
-    {"name": "weather", "description": "지역의 지금 날씨와 오늘·내일 예보 (기온·강수·날씨). 지역을 말하지 않았으면 서울.",
+    {"name": "weather", "description": "지역의 지금 날씨와 오늘·내일 예보 (기온·강수·날씨). 지역을 말하지 않았으면 서재에 설정된 기준 도시.",
      "inputSchema": {"type": "object", "properties": {"location": {"type": "string", "description": "도시 이름, 영어로 (예: Seoul, Busan, Jeju, Tokyo)"}}}},
     {"name": "fetch_url", "description": "공개 웹 페이지(http/https)를 읽어 본문 글자를 돌려준다. 사용자가 준 주소나 확인이 필요한 페이지에.",
      "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}},
@@ -638,18 +638,58 @@ _KO_CITY = {"서울": "Seoul", "부산": "Busan", "인천": "Incheon", "대구":
             "도쿄": "Tokyo", "오사카": "Osaka", "뉴욕": "New York", "런던": "London", "파리": "Paris", "베이징": "Beijing", "상하이": "Shanghai"}
 
 
-def _tool_weather(args):
-    loc = str(args.get("location") or "Seoul").strip()[:60]
+def _geo(loc):
+    """도시 이름(한글·영어) → Open-Meteo 지명 검색 결과 하나 또는 None"""
     name = re.sub(r"(특별자치시|특별자치도|특별시|광역시|시|군|구)$", "", loc) if re.search(r"[가-힣]", loc) else loc
-    tries = [_KO_CITY.get(name), loc, name]
-    geo = {}
-    for q in [t for t in tries if t]:   # 지명 검색은 한글을 잘 못 찾아 영어 이름을 먼저
-        geo = _get_json("https://geocoding-api.open-meteo.com/v1/search?count=1&language=ko&name=" + quote(q))
+    for q in [t for t in (_KO_CITY.get(name), loc, name) if t]:   # 지명 검색은 한글을 잘 못 찾아 영어 이름을 먼저
+        geo = _get_json("https://geocoding-api.open-meteo.com/v1/search?count=1&language=ko&name=" + quote(q), timeout=6)
         if geo.get("results"):
-            break
-    if not geo.get("results"):
+            return geo["results"][0]
+    return None
+
+
+_CITY_W = {}   # 도시 → (시각, 결과)
+CITY_W_TTL = 900
+
+
+def _sky(code):
+    """날씨 코드(WMO) → 창밖 풍경의 네 가지: clear·cloudy·rain·snow"""
+    if code in (71, 73, 75, 77, 85, 86):
+        return "snow"
+    if code in (51, 53, 55, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99):
+        return "rain"
+    return "cloudy" if code in (2, 3, 45, 48) else "clear"
+
+
+def city_weather(city=None):
+    """기준 도시의 지금 날씨 (창밖 풍경 '자동'용, 15분 보관). 못 받으면 {"city", "weather": ""}"""
+    city = city or lib3d.weather_city()
+    hit = _CITY_W.get(city)
+    if hit and time.time() - hit[0] < CITY_W_TTL:
+        return hit[1]
+    out = {"city": city, "weather": "", "text": "", "temp": None}
+    try:
+        g = _geo(city)
+        if g:
+            w = _get_json("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=auto&current=temperature_2m,weather_code"
+                          % (g["latitude"], g["longitude"]), timeout=8)
+            c = w.get("current", {})
+            code = c.get("weather_code")
+            out.update(weather=_sky(code), text=str(_WMO.get(code, "")), temp=c.get("temperature_2m"), place=g.get("name") or city)
+        else:
+            out["text"] = "도시를 찾지 못했습니다"
+    except Exception as e:  # noqa: BLE001 - 날씨를 못 받아도 서재는 그대로 (화면이 날마다 바뀌는 날씨로 대신한다)
+        out["text"] = "날씨를 받지 못했습니다"
+        log.info("기준 도시 날씨 실패 (%s): %s", city, e)
+    _CITY_W[city] = (time.time() if out["weather"] else time.time() - CITY_W_TTL + 120, out)   # 실패는 2분 뒤 다시
+    return out
+
+
+def _tool_weather(args):
+    loc = str(args.get("location") or lib3d.weather_city()).strip()[:60]
+    g = _geo(loc)
+    if not g:
         return "'%s' 위치를 찾지 못했습니다. 영어 도시 이름으로 다시 찾아보세요." % loc
-    g = geo["results"][0]
     w = _get_json("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=auto&forecast_days=2"
                   "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m"
                   "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" % (g["latitude"], g["longitude"]))

@@ -374,6 +374,8 @@ class Handler(BaseHTTPRequestHandler):
             # AI: 손님 대화 / 설정 / BookOasis MCP 연결 시험
             if path == "/api/lib3d/ai/settings":
                 return self._send(200, dict(lib3d_ai.settings(), success=True))
+            if path == "/api/lib3d/weather":   # 창밖 풍경 '자동' 날씨: 기준 도시의 지금 날씨
+                return self._send(200, dict(lib3d_ai.city_weather(), success=True))
             if path == "/api/lib3d/agents":   # AI 직원 설정·활동 기록 (관리자)
                 return self._send(200, dict(lib3d_agents.admin_info(), success=True))
             if path == "/api/lib3d/ai/chat":
@@ -672,7 +674,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"success": True, "models": lib3d.save_models(context.get("models"))})
             if "outside" in context and "libraries" not in context:   # 창밖 풍경만 저장
                 if not isinstance(context["outside"], dict):
-                    return self._send(400, {"success": False, "error": "outside는 {time, season, weather} 형식이어야 합니다."})
+                    return self._send(400, {"success": False, "error": "outside는 {time, season, weather, city} 형식이어야 합니다."})
                 return self._send(200, {"success": True, "outside": lib3d.save_outside(context["outside"])})
             if "people" in context and "libraries" not in context:   # 층별 인물 수만 저장
                 if not isinstance(context["people"], dict):
