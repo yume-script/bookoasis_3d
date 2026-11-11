@@ -497,8 +497,13 @@ def _short(job):
 REMOTE_TIMEOUT = 45
 
 
+def remote_enabled():
+    """바깥 AI(전화)를 쓰는가. 디스코드는 채널 연동(lib3d_discord)으로 하므로 기본은 끔 - LIB3D_REMOTE_AI=1일 때만"""
+    return config.env_bool("LIB3D_REMOTE_AI", False)
+
+
 def is_remote(a):
-    return bool((a or {}).get("remote_url")) and not is_guest(a)
+    return remote_enabled() and bool((a or {}).get("remote_url")) and not is_guest(a)
 
 
 def remote_call(a, payload, timeout=REMOTE_TIMEOUT):
@@ -985,4 +990,4 @@ def admin_info():
     return {"config": cfg, "last_run": st["last_run"], "present": lib3d_presence.active_count(), "log": st["log"][-40:][::-1], "budget": lib3d_ai.budget(),
             "notes": {k: v.get("notes", []) for k, v in st["agents"].items()}, "configured": lib3d_ai.configured(),
             "deliveries": lib3d_events.recent(), "events_on": bool(config.env("LIB3D_EVENT_TOKEN", "").strip()),
-            "discord": lib3d_discord.status()}
+            "discord": lib3d_discord.status(), "remote_on": remote_enabled()}

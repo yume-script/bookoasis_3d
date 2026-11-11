@@ -6,7 +6,7 @@
 받기 (디스코드 → 3D 서재): 봇 토큰 LIB3D_DISCORD_BOT_TOKEN으로 그 채널의 새 메시지를 LIB3D_DISCORD_POLL_SEC(3초)마다 읽는다
   - 채널은 LIB3D_DISCORD_CHANNEL_ID, 비우면 웹후크가 걸린 채널 (스레드로 보내면 그 스레드)
   - 스레드로 보내려면 웹후크 주소 뒤에 ?thread_id=스레드ID 를 붙이거나 LIB3D_DISCORD_THREAD_ID에 적는다
-  - 말한 사람은 "[LIB3D_DISCORD_LABEL] 이름"(예: [출판사] 애순이)으로 1층 채팅에 바로 보이고, 1층 라운지에 손님으로 들어와 말풍선을 띄운다
+  - 말한 사람은 "[LIB3D_DISCORD_LABEL] 이름"(예: [출판사] 애순이)으로 1층 채팅에 바로 보이고, 길 건너 사무실의 회의 탁자 의자에 앉아 말풍선을 띄운다 (사무실을 안 쓰면 1층 라운지)
     (말이 끊기고 STAY_SEC가 지나면 입구로 나간다)
   - 다른 봇·웹후크(예: 디스코드 봇의 인물들)가 쓴 글도 받는다. 이 서재가 웹후크로 보낸 글만 다시 받지 않는다(메아리 방지)
   - 봇은 디스코드 개발자 페이지에서 Message Content Intent를 켜야 내용을 읽을 수 있다. 채널 보기·메시지 기록 보기 권한 필요
@@ -297,7 +297,7 @@ def public(now=None):
             idle = now - g["last"]
             if idle > STAY_SEC + LEAVE_SEC:
                 continue
-            target = "entrance" if (now - g["first"] < ENTER_SEC or idle > STAY_SEC) else "lounge"
+            target = "entrance" if (now - g["first"] < ENTER_SEC or idle > STAY_SEC) else "office"   # 길 건너 사무실 의자에 앉는다 (사무실이 없으면 화면이 라운지에 세운다)
             out.append({"id": "dc_" + hashlib.md5(key.encode("utf-8")).hexdigest()[:12], "kind": "discord", "name": g["name"], "job": "",
                         "call": "", "post": "entrance", "look": 61 + g["slot"] * 3, "target": target, "slot": g["slot"],
                         "say": g["say"] if now - g["say_t"] < SAY_SEC else "", "book": "", "book_title": ""})

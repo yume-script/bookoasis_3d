@@ -80,7 +80,7 @@ class DiscordTest(unittest.TestCase):
         self.assertEqual({g["target"] for g in guests}, {"entrance"})   # 막 들어와 입구에서
         self.assertEqual(len({g["slot"] for g in guests}), 3)
         later = dc.public(now=dc._GUESTS["9"]["last"] + 10)
-        self.assertEqual({g["target"] for g in later}, {"lounge"})
+        self.assertEqual({g["target"] for g in later}, {"office"})
         self.assertEqual(dc.public(now=dc._GUESTS["9"]["last"] + dc.STAY_SEC + 5)[0]["target"], "entrance")   # 말이 끊기면 나감
         self.assertEqual(dc.public(now=dc._GUESTS["9"]["last"] + dc.STAY_SEC + dc.LEAVE_SEC + 5), [])
         dc._flush()

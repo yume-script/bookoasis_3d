@@ -344,10 +344,10 @@
     road: new T.MeshStandardMaterial({ map: roadTex, roughness: 0.9 }),
     trunk: new T.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 }),
     leaf: [0x5d8a4e, 0x6f9a55, 0x4f7a44, 0x83a862].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.9, flatShading: true }); }),
-    facade: [0xd9d2c4, 0xb8c2cc, 0xe7e1d6, 0xa9b3ab, 0xcfc4b8].map(function (c) { return new T.MeshStandardMaterial({ map: facadeTex, color: c, roughness: 1, metalness: 1, roughnessMap: facadePbrTex, metalnessMap: facadePbrTex }); }),
+    facade: [0xf3e2c7, 0xe9a48f, 0x9fd3c7, 0xf2c879, 0xe3c2b0, 0xb9d6e8].map(function (c) { return new T.MeshStandardMaterial({ map: facadeTex, color: c, roughness: 1, metalness: 1, roughnessMap: facadePbrTex, metalnessMap: facadePbrTex }); }),
     shopGlass: new T.MeshStandardMaterial({ color: 0x2a3540, roughness: 0.1, metalness: 0.5, emissive: 0x000000, emissiveIntensity: 0.9 }),
-    parapet: new T.MeshStandardMaterial({ color: 0x8d9094, roughness: 0.8 }),
-    awning: [0x7a2f2f, 0x2f4f6a, 0x3f5f3a, 0xc9a24a].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.8 }); }),
+    parapet: new T.MeshStandardMaterial({ color: 0xcdbfae, roughness: 0.8 }),
+    awning: [0xd85c4a, 0x3d8f8a, 0xf0b93c, 0xf4efe6].map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.8 }); }),
     glassPane: new T.MeshStandardMaterial({ color: 0xdfeaf2, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.12, depthWrite: false })
   });
   var poolGeo = new T.PlaneGeometry(7, 7); poolGeo.userData.shared = true;
@@ -510,7 +510,7 @@
     M.road.roughness = wet ? 0.25 : 0.9; tint(M.road, wet ? 0x8a8f96 : winter ? 0xe4e8ec : 0xffffff);
     M.pave.roughness = wet ? 0.35 : 0.95; tint(M.pave, winter ? 0xf2f4f6 : wet ? 0xb7b4ae : 0xffffff);
     tint(M.trunk, winter ? 0x5a4a3e : 0x6b4f3a); tint(M.pole, 0x3a3d42);
-    var FC = [0xd9d2c4, 0xb8c2cc, 0xe7e1d6, 0xa9b3ab, 0xcfc4b8];
+    var FC = [0xf3e2c7, 0xe9a48f, 0x9fd3c7, 0xf2c879, 0xe3c2b0, 0xb9d6e8];   // 따뜻한 파스텔 (크림·산호·민트·겨자·살구·하늘) - three.js 예제 webgl_animation_keyframes의 거리 색감
     M.facade.forEach(function (m, i) {
       tint(m, FC[i % FC.length]);
       m.emissiveMap = (night || dusk) ? facadeNightTex : null; m.emissive.setHex((night || dusk) ? 0xffffff : 0x000000);
@@ -524,7 +524,7 @@
       .forEach(function (m) { m.envMapIntensity = envOut; m.userData.envSet = true; });
     M.shopGlass.emissive.setHex(night ? 0x1c1208 : dusk ? 0x120c05 : 0x000000);   // 빛 세기는 선형값이라 아주 어둡게 줘야 은은하다
     CAR.head.emissive.setHex(night || dusk || grey ? 0xfff6dd : 0x000000); CAR.tail.emissive.setHex(night || dusk || grey ? 0xff2a1a : 0x000000);
-    tint(M.parapet, 0x8d9094); M.awning.forEach(function (m, i) { tint(m, [0x7a2f2f, 0x2f4f6a, 0x3f5f3a, 0xc9a24a][i]); });
+    tint(M.parapet, 0xcdbfae); M.awning.forEach(function (m, i) { tint(m, [0xd85c4a, 0x3d8f8a, 0xf0b93c, 0xf4efe6][i]); });
     CAR.paint.forEach(function (m, i) { tint(m, [0xe8e6e1, 0x1f2328, 0x8b1e2b, 0x2c4a7a, 0x9aa2a8, 0x3d5a45, 0xd9c79c][i]); });
     // 빛: 낮은 지금 그대로, 노을은 따뜻하게 낮게, 밤은 달빛 + 실내 조명
     var bg = night ? 0x1a2030 : dusk ? 0xe9cdb5 : grey ? 0xd9dcde : 0xf3efe8;
@@ -1013,14 +1013,15 @@
     CAMP.flare.opacity = night ? 0.7 : dusk ? 0.35 : 0;
     CAMP.fuji.color.setHex(night ? 0x4d4f86 : dusk ? 0xf2b9a0 : grey ? 0xc3c8cf : 0xffffff);
     [CAMP.bank, CAMP.wood, CAMP.dirt, CAMP.canopy, CAMP.stone, CAMP.hammock, CAMP.chair, CAMP.cooler].concat(CAMP.tent, CAMP.pine).forEach(function (m) { m.envMapIntensity = envOut; });
-    if (campFx) campFx.night = night ? 1 : dusk ? 0.6 : grey ? 0.4 : 0.25;
+    if (campFx) { campFx.night = night ? 1 : dusk ? 0.6 : grey ? 0.4 : 0.25; campFx.dark = night; }
+    BIRD.mats.forEach(function (m) { m.color.setScalar(Math.max(0.35, f)); m.envMapIntensity = envOut; });
   }
   function addRiverCamp(w, back, front, gy, floorIdx) {
     var cz = (front + back) / 2, z0 = front + PLAZA_D + RIVER_GAP, z1 = z0 + RIVER_W, W = SCENE_R * 2;
     var farZ = cz + SCENE_R - 4, campZ1 = Math.min(z1 + CAMP_D, farZ - 18), hw = w / 2 + 4.6, r = rnd(907);
     var walk = floorIdx === 0 && cur === 0;
     RV = walk ? { z0: z0, z1: z1, cz1: campZ1, hw: hw, blocks: [], rects: [], seats: [], fire: null } : null;
-    campFx = { night: 0.25, flames: [], light: null, t: 0, horses: [], paddock: null, group: null };
+    campFx = { night: 0.25, flames: [], light: null, t: 0, horses: [], paddock: null, group: null, birds: [], birdKinds: [], sky: { x: 0, y: gy, z: (z0 + z1) / 2 + 8 }, dark: false };
     function plane(wd, dp, mat, x, y, z) { var m = new T.Mesh(new T.PlaneGeometry(wd, dp), mat); m.rotation.x = -Math.PI / 2; return add(m, x, y, z); }
     function ubox(sx, sy, sz, mat, x, y, z) { var m = new T.Mesh(unitBox, mat); m.scale.set(sx, sy, sz); return add(m, x, y, z); }
     // 땅(강 이쪽·저쪽) + 강물(땅보다 낮게) + 돌 둑
@@ -1139,7 +1140,7 @@
     ubox(1.6, 0.5, 0.6, CAMP.wood, PD.x1 - 1.6, gy + 0.3, PD.z0 + 1.2);   // 물통
     if (RV) RV.rects.push(PD);
     campFx.paddock = { cx: (PD.x0 + PD.x1) / 2, cz: (PD.z0 + PD.z1) / 2, rx: (PD.x1 - PD.x0) / 2 - 2.2, rz: (PD.z1 - PD.z0) / 2 - 2.2, gy: gy };
-    campFx.group = parent; addHorses();
+    campFx.group = parent; addHorses(); addBirds();
     var spots = [], rowsN = Math.max(2, Math.floor((campZ1 - z1 - 8) / 11));
     for (var ry0 = 0; ry0 < rowsN; ry0++) for (var sx0 = -hw + 5; sx0 <= hw - 5; sx0 += 9.5) {
       var tx = sx0 + (r() - 0.5) * 3, tz2 = z1 + 6 + ry0 * 11 + (r() - 0.5) * 3 + (ry0 === 0 ? 0 : 3);
@@ -1190,6 +1191,36 @@
     }
     updateCamp(0, performance.now());
   }
+  // 새: three.js 예제 webgl_lights_hemisphere의 Flamingo.glb와 같은 묶음의 Stork·Parrot (날갯짓 모양 변형). 강과 캠핑장 위를 돈다.
+  var BIRD = { kinds: [], mats: [] };
+  function loadBirds() {
+    if (!T.GLTFLoader) return;
+    [['Stork.glb', 0.016], ['Flamingo.glb', 0.016], ['Parrot.glb', 0.013]].forEach(function (b) {
+      new T.GLTFLoader().load(MODEL_BASE + b[0], function (gl) {
+        var mesh = null; gl.scene.traverse(function (o) { if (o.isMesh && !mesh) mesh = o; });
+        if (!mesh || !gl.animations.length) return;
+        mesh.geometry.userData.shared = true;
+        var m = mesh.material.clone(); m.userData.keep = true; m.userData.envSet = true; m.morphTargets = true; m.fog = false; BIRD.mats.push(m);
+        BIRD.kinds.push({ mesh: mesh, mat: m, clip: gl.animations[0], scale: b[1] });
+        addBirds(); applyOutside.force = true; applyOutside();
+      }, undefined, function (e) { console.warn('3D 서재 새 모형:', e && e.message); });
+    });
+  }
+  function addBirds() {   // 받은 종류마다 몇 마리씩 (층을 지을 때마다 다시)
+    if (!campFx || !campFx.group || !campFx.sky) return;
+    BIRD.kinds.forEach(function (k, ki) {
+      if (campFx.birdKinds.indexOf(k) >= 0) return;
+      campFx.birdKinds.push(k);
+      var r = rnd(331 + ki * 17), n = ki === 0 ? 3 : 2;
+      for (var i = 0; i < n; i++) {
+        var b = new T.Mesh(k.mesh.geometry, k.mat); b.scale.setScalar(k.scale * (0.85 + r() * 0.3));
+        if (k.mesh.morphTargetInfluences) { b.morphTargetInfluences = k.mesh.morphTargetInfluences.slice(); b.morphTargetDictionary = k.mesh.morphTargetDictionary; }
+        var mx = new T.AnimationMixer(b); mx.clipAction(k.clip).setDuration(0.9 + r() * 0.5).play(); mx.update(r());
+        campFx.group.add(b);
+        campFx.birds.push({ m: b, mixer: mx, a: r() * 6.28, rad: 22 + r() * 34, h: 13 + r() * 14, sp: (0.1 + r() * 0.08) * (r() < 0.5 ? 1 : -1), ox: (r() - 0.5) * 30, oz: (r() - 0.5) * 24, ph: r() * 6 });
+      }
+    });
+  }
   function campWalk(x, z) {   // 가운데 나무다리 + 캠핑장 풀밭 (텐트·차·모닥불은 돌아서)
     if (!RV || !layout) return false;
     if (Math.abs(x) < 1.45 && z >= layout.front + PLAZA_D - 0.5 && z <= RV.z1 + 1) return true;
@@ -1230,6 +1261,14 @@
       var hx = Math.sin(H.a) * P.rx * rk, hz = Math.cos(H.a) * P.rz * rk;
       H.m.position.set(P.cx + hx, P.gy + H.lift, P.cz + hz);
       H.m.rotation.y = Math.atan2(Math.cos(H.a) * P.rx * rk, -Math.sin(H.a) * P.rz * rk);
+    }
+    for (var bi = 0; bi < campFx.birds.length; bi++) {   // 새: 높이를 조금씩 바꾸며 큰 원을 그린다 (밤에는 쉰다)
+      var B = campFx.birds[bi], S = campFx.sky;
+      B.m.visible = !campFx.dark; if (campFx.dark) continue;
+      B.mixer.update(dt); B.a += dt * B.sp;
+      B.m.position.set(S.x + B.ox + Math.sin(B.a) * B.rad, S.y + B.h + Math.sin(now / 4000 + B.ph) * 1.5, S.z + B.oz + Math.cos(B.a) * B.rad * 0.7);
+      B.m.rotation.y = Math.atan2(Math.cos(B.a) * B.rad * B.sp, -Math.sin(B.a) * B.rad * 0.7 * B.sp);
+      B.m.rotation.z = -0.25 * (B.sp > 0 ? 1 : -1);   // 도는 쪽으로 살짝 기울인다
     }
     if (campFx.light) campFx.light.intensity = campFx.night * (1.5 + Math.sin(now / 110) * 0.25 + Math.sin(now / 43) * 0.15);
   }
@@ -1680,6 +1719,17 @@
       var bk = new T.Mesh(unitBox, wood); bk.scale.set(0.5, 0.45, 0.05); bk.position.set(0, 0.72, -0.23); g.add(bk);
       addSeat(p0.x, p0.z, s * Math.PI / 2, 0.48);
     });
+    // 회의 탁자 + 의자 여덟 (디스코드에서 온 출판사 사람들이 앉는 자리)
+    boxAt(wood, 1.1, 0.06, 3.4, P(5.3, 0, 0.74));
+    [3.9, 6.7].forEach(function (d0) { boxAt(dark, 0.9, 0.7, 0.08, P(d0, 0, 0.36)); });
+    OFFICE.seats = []; OFFICE.door = { x: R.fx + s * 1.0, z: z, rot: R.inRot };
+    [1, -1].forEach(function (sd) { [4.1, 4.9, 5.7, 6.5].forEach(function (d0) {
+      var p1 = P(d0, sd * 0.95, 0), g1 = new T.Group(), rot = sd > 0 ? Math.PI : 0; g1.position.copy(p1); g1.rotation.y = rot; parent.add(g1);
+      var s1 = new T.Mesh(unitBox, dark); s1.scale.set(0.5, 0.08, 0.5); s1.position.y = 0.47; g1.add(s1);
+      var b1 = new T.Mesh(unitBox, dark); b1.scale.set(0.5, 0.55, 0.06); b1.position.set(0, 0.8, -0.24); g1.add(b1);
+      var l1 = new T.Mesh(unitBox, M.pole); l1.scale.set(0.06, 0.44, 0.06); l1.position.y = 0.22; g1.add(l1);
+      OFFICE.seats.push({ x: p1.x, z: p1.z, rot: rot });
+    }); });
     // 책장 (옆 벽) + 소파·탁자 (앞쪽) + 화분
     [-1, 1].forEach(function (sd) {
       var bx0 = R.bx + s * 0.3, zz = z + sd * (R.bw / 2 - 0.25);
@@ -3914,7 +3964,7 @@
       if (!firstOf[sub]) { firstOf[sub] = true; fs.classList.add('open'); }
       var head = document.createElement('button'); head.type = 'button'; head.className = 'fs-head';
       var hb = document.createElement('b'); hb.textContent = a.name; head.appendChild(hb);
-      var hs = document.createElement('small'); hs.textContent = a.job + (a.remote_url ? ' · 바깥 AI(전화)' : ''); head.appendChild(hs);
+      var hs = document.createElement('small'); hs.textContent = a.job + (d.remote_on && a.remote_url ? ' · 바깥 AI(전화)' : ''); head.appendChild(hs);
       if (a.enabled === false) { var off = document.createElement('span'); off.className = 'off-tag'; off.textContent = guest ? '안 옴' : '쉼'; head.appendChild(off); }
       var arrow = document.createElement('i'); arrow.textContent = '›'; head.appendChild(arrow);
       head.addEventListener('click', function () { fs.classList.toggle('open'); });
@@ -3928,7 +3978,7 @@
       if (!guest) g2.appendChild(labeled('부르는 말 (쉼표로)', staffInput('input', (a.call || []).join(', '), { type: 'text', 'data-f': 'call' })));
       fb.appendChild(labeled(guest ? '찾는 것' : '목표', staffInput('textarea', a.goal, { type: 'text', 'data-f': 'goal' })));
       fb.appendChild(labeled('성격', staffInput('textarea', a.personality, { type: 'text', 'data-f': 'personality' })));
-      if (!guest) {   // 전화: 이 직원의 생각을 바깥 AI(예: 디스코드 봇 캐릭터)가 맡는다
+      if (!guest && d.remote_on) {   // 전화: 이 직원의 생각을 바깥 AI가 맡는다 (.env의 LIB3D_REMOTE_AI=1일 때만 보임 - 디스코드는 채널 연동을 쓴다)
         h4(fb, '바깥 AI (전화) - 넣으면 질문·보고를 그 주소로 보내고, 이 직원의 자율 업무는 쉼');
         var g3 = document.createElement('div'); g3.className = 'grid2'; fb.appendChild(g3);
         g3.appendChild(labeled('주소', staffInput('input', a.remote_url || '', { type: 'url', 'data-f': 'remote_url', placeholder: '비우면 이 서버의 AI' })));
@@ -5370,7 +5420,7 @@
       }
       var p = staffNPC[s.id];
       if (p && p.g.parent !== floorGroup) { disposeGroup(p.g); p = null; }
-      if (!p) p = staffNPC[s.id] = makeStaff(s);
+      if (!p) { p = staffNPC[s.id] = makeStaff(s); p.fresh = true; }
       var pos = null, face = null;
       if (s.target === 'book' && s.book) {
         var bk = bookByKey(s.book);
@@ -5385,8 +5435,16 @@
         var q = placePos(s.target); if (q) { pos = [q[0], q[1]]; face = q[2]; }
       }
       if (!pos && s.target !== 'book') { var h = placePos(s.post) || placePos('lobby'); pos = [h[0], h[1]]; face = h[2]; }
-      if (pos && s.kind === 'discord') {   // 디스코드 손님은 라운지에 나란히 (자리 번호대로)
-        var sl = s.slot || 0; pos = [pos[0] + ((sl % 4) - 1.5) * 1.1, pos[1] + Math.floor(sl / 4) * 1.2 - 0.6];
+      if (s.kind === 'discord') {   // 디스코드에서 온 사람: 길 건너 사무실 회의 탁자 의자에 앉는다 (사무실이 없으면 라운지에 나란히)
+        var sl = s.slot || 0; p.seatRot = null;
+        if (OFFICE && OFFICE.seats && OFFICE.seats.length) {
+          if (s.target === 'entrance') { pos = [OFFICE.door.x, OFFICE.door.z + ((sl % 3) - 1) * 0.5]; face = OFFICE.door.rot; }   // 들어오고 나갈 때는 사무실 문
+          else { var seat = OFFICE.seats[sl % OFFICE.seats.length]; pos = [seat.x, seat.z]; face = seat.rot; p.seatRot = seat.rot; }
+          if (p.fresh) { p.fresh = false; p.g.position.set(OFFICE.door.x, 0, OFFICE.door.z); }
+        } else {
+          if (s.target !== 'entrance') { var lq = placePos('lounge'); pos = [lq[0], lq[1]]; face = lq[2]; }
+          if (pos) pos = [pos[0] + ((sl % 4) - 1.5) * 1.1, pos[1] + Math.floor(sl / 4) * 1.2 - 0.6];
+        }
       }
       if (pos) { p.tx = pos[0]; p.tz = pos[1]; p.face = face; }   // 이 화면에 없는 책이면 그 자리에 머문다
       var say = s.say || '';
@@ -5414,6 +5472,7 @@
       p.mixer.update(dt);
       applyLook(p, now);
     }
+    if (p.seatRot !== undefined) { p.sit = p.seatRot != null && !moving; sitPose(p, dt); }   // 사무실 의자에 앉기
   }
   function showPointer(bk, key) {   // 가리키는 책 위에 통통 튀는 화살표
     if (pointer && pointer.key === key) return;
@@ -5531,6 +5590,7 @@
   loadHumans();
   loadOutEnv();
   loadHorse();
+  loadBirds();
   build(false);
   requestAnimationFrame(frame);
   if ('ResizeObserver' in window) new ResizeObserver(resize).observe(wrap);
