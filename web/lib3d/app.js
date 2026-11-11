@@ -1192,13 +1192,29 @@
     g.translate(64, 64);
     for (var i = 0; i < 6; i++) { g.rotate(Math.PI / 6); var lg = g.createLinearGradient(-62, 0, 62, 0); lg.addColorStop(0, 'rgba(255,220,160,0)'); lg.addColorStop(0.5, 'rgba(255,235,190,0.8)'); lg.addColorStop(1, 'rgba(255,220,160,0)'); g.fillStyle = lg; g.fillRect(-62, -0.8, 124, 1.6); }
   });
-  var TENT_COLORS = [0xd9772e, 0xc8651f, 0x8a6a45, 0xa8552a, 0x6f7f4a, 0xe3c9a0, 0xb9482e, 0x9a7b55];
+  var TENT_COLORS = [0xe8dcc6, 0xf3ede1, 0xa8875f, 0x8a6e52, 0x7d8466, 0xd9c7a6, 0xcbb894, 0x9a8a70];   // 면 텐트 색: 베이지·크림·황갈·갈색·올리브·모래
+  var tentTex = canvasTex(256, 256, function (g, w, h) {   // 천의 짜임과 잔주름
+    var r = rnd(149); g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+    for (var y = 0; y < h; y += 2) { g.fillStyle = 'rgba(0,0,0,0.03)'; g.fillRect(0, y, w, 1); }
+    for (var i = 0; i < 70; i++) { g.strokeStyle = 'rgba(' + (r() < 0.6 ? '0,0,0,' : '255,255,255,') + (0.04 + r() * 0.07) + ')'; g.lineWidth = 1 + r() * 2;
+      var x = r() * w, y2 = r() * h; g.beginPath(); g.moveTo(x, y2); g.quadraticCurveTo(x + (r() - 0.5) * 60, y2 + 30 + r() * 40, x + (r() - 0.5) * 30, y2 + 70 + r() * 60); g.stroke(); }
+    g.fillStyle = 'rgba(0,0,0,0.1)'; for (var sx = 0; sx < w; sx += w / 4) g.fillRect(sx, 0, 1.5, h);   // 이음 솔기
+  }, [4, 1]);
   var CAMP = {
     water: new T.MeshStandardMaterial({ map: waterTex, color: 0x4f86a8, roughness: 0.12, metalness: 0.55 }),
     bank: new T.MeshStandardMaterial({ color: 0x8e8a80, roughness: 0.95 }),
     wood: new T.MeshStandardMaterial({ color: 0x8a6645, roughness: 0.85 }),
     dirt: new T.MeshStandardMaterial({ color: 0xb09a78, roughness: 1 }),
-    tent: TENT_COLORS.map(function (c) { return new T.MeshStandardMaterial({ color: c, roughness: 0.85, side: T.DoubleSide, emissive: 0x000000, flatShading: true }); }),
+    tent: TENT_COLORS.map(function (c) { return new T.MeshStandardMaterial({ color: c, map: tentTex, roughness: 0.92, side: T.DoubleSide, emissive: 0x000000 }); }),
+    trim: new T.MeshStandardMaterial({ color: 0x6b5644, roughness: 0.9, side: T.DoubleSide }),          // 치마·처마 띠·끝 천
+    inside: new T.MeshStandardMaterial({ color: 0x2a221b, roughness: 1, side: T.DoubleSide, emissive: 0x000000 }),   // 열린 문 안쪽 (밤엔 불빛)
+    mesh: new T.MeshStandardMaterial({ color: 0x3a3a36, roughness: 1, side: T.DoubleSide }),            // 모기장 창
+    frame: new T.MeshStandardMaterial({ color: 0x8a8d90, roughness: 0.5, metalness: 0.5 }),
+    cushion: new T.MeshStandardMaterial({ color: 0xe9e1d0, map: fabricTex, roughness: 1 }),
+    rug: new T.MeshStandardMaterial({ color: 0xe6dcc8, map: fabricTex, roughness: 1 }),
+    steel: new T.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.55, metalness: 0.7, side: T.DoubleSide }),
+    ember: new T.MeshStandardMaterial({ color: 0x3a1a0c, emissive: 0xff5a14, emissiveIntensity: 0.9, roughness: 1 }),
+    rope: new T.LineBasicMaterial({ color: 0xd8d2c0 }),
     canopy: new T.MeshStandardMaterial({ color: 0x3f7a55, roughness: 0.85, side: T.DoubleSide }),
     lamp: new T.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0x000000, emissiveIntensity: 2.2, roughness: 0.4 }),
     flame: new T.MeshBasicMaterial({ color: 0xffa23a, transparent: true, opacity: 0.9, fog: false }),
@@ -1223,8 +1239,13 @@
     tint(CAMP.bank, winter ? 0xdfe3e6 : 0x8e8a80); tint(CAMP.wood, 0x8a6645); tint(CAMP.dirt, winter ? 0xe6e6e2 : 0xb09a78);
     CAMP.tent.forEach(function (m, i) {   // 밤에는 안에 켠 랜턴으로 천이 주황빛으로 비친다
       tint(m, TENT_COLORS[i]);
-      m.emissive.setHex(night ? 0xff8a2a : dusk ? 0x7a3a10 : 0x000000); m.emissiveIntensity = night ? (i % 3 === 2 ? 0.25 : 0.75) : 0.35;
+      m.emissive.setHex(night ? 0xff9a3a : dusk ? 0x7a3a10 : 0x000000); m.emissiveIntensity = night ? (i > 1 && i !== 5 && i !== 6 ? 0.18 : 0.42) : 0.25;   // 밝은 면 텐트가 더 환하게 비친다
     });
+    tint(CAMP.trim, 0x6b5644); tint(CAMP.mesh, 0x3a3a36); tint(CAMP.frame, 0x8a8d90); tint(CAMP.cushion, 0xe9e1d0); tint(CAMP.rug, 0xe6dcc8); tint(CAMP.steel, 0x2b2d30);
+    CAMP.inside.emissive.setHex(night ? 0xffa040 : dusk ? 0x5a2c0c : 0x000000); CAMP.inside.emissiveIntensity = night ? 0.9 : 0.4;
+    CAMP.rope.color.setHex(0xd8d2c0).multiplyScalar(Math.max(0.3, f));
+    CAMP.flame.opacity = night ? 0.8 : dusk ? 0.7 : 0.55;
+    [CAMP.trim, CAMP.mesh, CAMP.frame, CAMP.cushion, CAMP.rug, CAMP.steel, CAMP.inside].forEach(function (m) { m.envMapIntensity = envOut; });
     tint(CAMP.canopy, 0x3f7a55); tint(CAMP.stone, 0x6f6b66); tint(CAMP.hammock, 0x3b6fb0); tint(CAMP.chair, 0x4a5a48); tint(CAMP.cooler, 0xd9e4ea); tint(CAMP.lot, winter ? 0xd8dadb : 0x77736c); CAMP.lot.envMapIntensity = envOut;
     if (HORSE.mats) HORSE.mats.forEach(function (m) { m.color.setHex(m.userData.base).multiplyScalar(Math.max(0.2, f)); m.envMapIntensity = envOut; });
     CAMP.pine.forEach(function (m, i) { tint(m, winter ? [0x9fb0a4, 0xaebcb2, 0x8fa398][i] : [0x2f5a3c, 0x3a6a45, 0x274d35][i]); });
@@ -1293,20 +1314,70 @@
       var fl = new T.Sprite(CAMP.flare); fl.scale.set(2.2, 2.2, 1); add(fl, x, gy + hgt + 0.05, z);
       var pool = new T.Mesh(poolGeo, M.lightPool); pool.rotation.x = -Math.PI / 2; add(pool, x, gy + 0.03, z);
     }
-    function tent(kind, x, z, ry, mat) {
+    function tent(kind, x, z, ry, mat) {   // 0 벨 텐트 · 1 티피 · 2 터널형 거실 텐트 · 3 흰 프레임 텐트 · 4 타프 쉘터 (앞은 +z)
       var g = new T.Group(); g.position.set(x, gy, z); g.rotation.y = ry; parent.add(g);
       function gm(geo, m, sx, sy, sz, px, py, pz) { var q = new T.Mesh(geo, m); q.scale.set(sx, sy, sz); q.position.set(px || 0, py || 0, pz || 0); g.add(q); return q; }
-      if (kind === 0) {   // 돔 텐트 + 앞 전실
-        gm(domeGeo, mat, 2.0, 1.55, 1.8); gm(domeGeo, mat, 1.1, 1.0, 1.0, 0, 0, 1.5); block(x, z, 2.1);
-      } else if (kind === 1) {   // 원뿔(티피) 텐트
-        gm(tipiGeo, mat, 2.1, 3.3, 2.1, 0, 1.65, 0); gm(unitBox, M.pole, 0.05, 0.6, 0.05, 0, 3.4, 0); block(x, z, 1.9);
-      } else if (kind === 2) {   // 타프 쉘터 (맞배 지붕 천 + 기둥) - 아래로 지나다닐 수 있다
+      function ropes(pts) {   // 당김줄: [x1,y1,z1, x2,y2,z2 …] + 끝마다 팩
+        var lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(pts, 3)); g.add(new T.LineSegments(lg, CAMP.rope));
+        for (var k = 3; k < pts.length; k += 6) gm(unitBox, M.pole, 0.03, 0.16, 0.03, pts[k], 0.06, pts[k + 2]);
+      }
+      function tri(w0, h0, m) { var sh = new T.Shape(); sh.moveTo(-w0 / 2, 0); sh.lineTo(w0 / 2, 0); sh.lineTo(0, h0); sh.closePath(); return new T.Mesh(new T.ShapeGeometry(sh), m); }
+      var rp = [], k0, a0;
+      if (kind === 0) {   // 벨 텐트: 낮은 둥근 벽 + 원뿔 지붕, 앞에 ㅅ자 문
+        gm(new T.CylinderGeometry(2.2, 2.2, 0.75, 12, 1, true), mat, 1, 1, 1, 0, 0.375, 0);
+        gm(new T.ConeGeometry(2.34, 2.25, 12, 1, true), mat, 1, 1, 1, 0, 0.75 + 1.125, 0);
+        gm(new T.CylinderGeometry(2.36, 2.36, 0.06, 12, 1, true), CAMP.trim, 1, 1, 1, 0, 0.75, 0);   // 처마 띠
+        gm(new T.ConeGeometry(0.22, 0.3, 12), CAMP.trim, 1, 1, 1, 0, 3.05, 0); gm(unitBox, M.pole, 0.04, 0.25, 0.04, 0, 3.3, 0);
+        var door = tri(1.25, 1.75, CAMP.inside); door.position.set(0, 0.02, 2.14); door.rotation.x = -0.36; g.add(door);
+        [-1, 1].forEach(function (sd) { var fl = gm(unitBox, mat, 0.16, 1.5, 0.05, sd * 0.5, 0.8, 2.0); fl.rotation.set(-0.36, 0, sd * 0.33); gm(unitBox, M.pole, 0.035, 1.85, 0.035, sd * 0.33, 0.9, 1.93).rotation.set(-0.36, 0, sd * 0.34); });
+        for (k0 = 0; k0 < 12; k0++) { a0 = (k0 + 0.5) / 12 * Math.PI * 2; if (Math.abs(Math.sin(a0)) < 0.3 && Math.cos(a0) > 0) continue; rp.push(Math.sin(a0) * 2.34, 0.75, Math.cos(a0) * 2.34, Math.sin(a0) * 3.5, 0, Math.cos(a0) * 3.5); }
+        ropes(rp); block(x, z, 2.4);
+      } else if (kind === 1) {   // 티피(피라미드): 여덟 면 원뿔 + 아래 치마, 앞면 지퍼 문 한쪽을 걷어 올림
+        var cone = new T.ConeGeometry(2.3, 3.4, 8, 1, true); cone.rotateY(Math.PI / 8);
+        var sk = new T.CylinderGeometry(2.3, 2.3, 0.28, 8, 1, true); sk.rotateY(Math.PI / 8);
+        gm(cone, mat, 1, 1, 1, 0, 0.28 + 1.7, 0); gm(sk, CAMP.trim, 1, 1, 1, 0, 0.14, 0);
+        gm(new T.ConeGeometry(0.3, 0.42, 8), CAMP.trim, 1, 1, 1, 0, 3.55, 0); gm(unitBox, M.pole, 0.04, 0.3, 0.04, 0, 3.85, 0);
+        var ap = 2.3 * Math.cos(Math.PI / 8), tilt = Math.atan2(ap, 3.4);
+        gm(unitBox, CAMP.trim, 0.035, 2.5, 0.02, 0, 0.28 + 1.2, ap * (1 - 1.2 / 3.4) + 0.02).rotation.x = -tilt;   // 지퍼 선
+        var dr = tri(0.9, 1.7, CAMP.inside); dr.geometry.translate(0.45, 0, 0); dr.position.set(0.02, 0.3, ap * (1 - 0.02 / 3.4) + 0.03); dr.rotation.x = -tilt; g.add(dr);
+        var roll = gm(new T.CylinderGeometry(0.07, 0.07, 1.5, 8), mat, 1, 1, 1, 0.62, 0.95, ap * 0.74 + 0.08); roll.rotation.set(-tilt, 0, -0.42);   // 말아 올린 문 자락
+        var vent = tri(0.3, 0.22, CAMP.inside); vent.position.set(-0.25, 2.5, ap * (1 - 2.25 / 3.4) + 0.03); vent.rotation.x = -tilt; g.add(vent);
+        for (k0 = 0; k0 < 8; k0++) { a0 = k0 / 8 * Math.PI * 2; if (k0 === 0) continue; rp.push(Math.sin(a0) * 2.3 * 0.62, 0.28 + 3.4 * 0.38, Math.cos(a0) * 2.3 * 0.62, Math.sin(a0) * 3.7, 0, Math.cos(a0) * 3.7); }
+        ropes(rp); block(x, z, 2.2);
+      } else if (kind === 2) {   // 터널형 거실 텐트: 긴 반원통 + 둥근 뒤 끝, 활대 넷, 앞에 폴 둘로 세운 차양
+        var body = new T.CylinderGeometry(1.55, 1.55, 4.6, 18, 1, true, Math.PI / 2, Math.PI); body.rotateX(Math.PI / 2);
+        gm(body, mat, 1, 1.22, 1, 0, 0, 0);
+        gm(new T.SphereGeometry(1.55, 14, 8, Math.PI, Math.PI, 0, Math.PI / 2), CAMP.trim, 1, 1.22, 0.75, 0, 0, -2.3);
+        var fr = new T.Mesh(new T.CircleGeometry(1.55, 18, 0, Math.PI), CAMP.trim); fr.scale.y = 1.22; fr.position.set(0, 0, 2.3); g.add(fr);
+        var dm = new T.Mesh(new T.PlaneGeometry(1.3, 1.45), CAMP.inside); dm.position.set(0, 0.74, 2.32); g.add(dm);
+        [-0.9, 0.9].forEach(function (wx) { var wn = new T.Mesh(new T.PlaneGeometry(0.42, 0.5), CAMP.mesh); wn.position.set(wx * 1.15, 0.75, 2.32); g.add(wn); });
+        [-2.3, -0.77, 0.77, 2.3].forEach(function (pz) { var ar = new T.Mesh(new T.TorusGeometry(1.57, 0.024, 6, 20, Math.PI), M.pole); ar.scale.y = 1.22; ar.position.z = pz; g.add(ar); });
+        [-1, 1].forEach(function (sd) { [-1.4, 0.2].forEach(function (wz) { var w2 = gm(unitBox, CAMP.mesh, 0.02, 0.5, 0.8, sd * 1.42, 0.85, wz); w2.rotation.z = sd * 0.42; }); });   // 옆 창 (모기장)
+        var aw = gm(unitBox, mat, 2.9, 0.025, 2.3, 0, 1.82, 3.4); aw.rotation.x = 0.07;                                                // 차양
+        [-1.38, 1.38].forEach(function (px) { gm(unitBox, M.pole, 0.035, 1.78, 0.035, px, 0.89, 4.5); rp.push(px, 1.76, 4.5, px * 1.5, 0, 5.9); });
+        [-1, 1].forEach(function (sd) { [-2.3, 0, 2.3].forEach(function (pz) { rp.push(sd * 1.5, 0.75, pz, sd * 2.5, 0, pz); }); });
+        ropes(rp);
+        [-1.4, 1.4].forEach(function (o) { block(x + Math.sin(ry) * o, z + Math.cos(ry) * o, 1.9); });
+      } else if (kind === 3) {   // 흰 프레임 텐트: 둥근 상자 천 + 회색 폴대, 앞을 양옆으로 묶어 연 자락, 안에 쿠션, 아래 러그
+        gm(rbox(2.3, 1.75, 2.3, 0.32), mat, 1, 1, 1, 0, 0.875, 0);
+        var rg = new T.Mesh(new T.PlaneGeometry(3.0, 3.0), CAMP.rug); rg.rotation.x = -Math.PI / 2; rg.position.y = 0.02; g.add(rg);
+        var op = new T.Mesh(new T.PlaneGeometry(1.5, 1.4), CAMP.inside); op.position.set(0, 0.72, 1.157); g.add(op);
+        [-1, 1].forEach(function (sd) {
+          var dp = gm(rbox(0.5, 1.4, 0.07, 0.03), mat, 1, 1, 1, sd * 0.62, 0.74, 1.19); dp.rotation.z = -sd * 0.16;                     // 묶은 자락
+          gm(unitBox, CAMP.trim, 0.2, 0.035, 0.09, sd * 0.56, 0.8, 1.2);
+          [-1, 1].forEach(function (sz) { gm(new T.CylinderGeometry(0.02, 0.02, 1.5, 6), CAMP.frame, 1, 1, 1, sd * 1.17, 0.75, sz * 1.17); });   // 모서리 폴
+          var ar = new T.Mesh(new T.TorusGeometry(1.17, 0.02, 6, 14, Math.PI), CAMP.frame); ar.scale.y = 0.36; ar.position.set(0, 1.45, sd * 1.17); g.add(ar);
+          var ar2 = new T.Mesh(new T.TorusGeometry(1.17, 0.02, 6, 14, Math.PI), CAMP.frame); ar2.scale.y = 0.36; ar2.rotation.y = Math.PI / 2; ar2.position.set(sd * 1.17, 1.45, 0); g.add(ar2);
+        });
+        gm(rbox(0.55, 0.45, 0.16, 0.07), CAMP.cushion, 1, 1, 1, -0.3, 0.3, 0.95).rotation.x = -0.4;
+        gm(rbox(0.5, 0.42, 0.16, 0.07), CAMP.cushion, 1, 1, 1, 0.28, 0.32, 0.8).rotation.set(-0.3, 0.3, 0);
+        gm(rbox(0.55, 0.14, 0.4, 0.06), CAMP.cushion, 1, 1, 1, 0.45, 0.09, 1.1);
+        block(x, z, 1.75);
+      } else {   // 타프 쉘터 (맞배 지붕 천 + 기둥) - 아래로 지나다닐 수 있다
         [-1, 1].forEach(function (s) { var p = gm(unitBox, mat, 2.9, 0.03, 4.6, s * 1.25, 2.05, 0); p.rotation.z = -s * 0.55; });
-        [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.06, 2.8, 0.06, 0, 1.4, pz); });
-        [-1, 1].forEach(function (s) { [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.05, 1.3, 0.05, s * 2.45, 0.65, pz); }); });
-      } else {   // 캐노피 (네 기둥 + 초록 지붕)
-        gm(tipiGeo, CAMP.canopy, 2.4, 0.9, 2.4, 0, 2.75, 0).rotation.y = Math.PI / 4;
-        [-1, 1].forEach(function (s) { [-1, 1].forEach(function (t) { gm(unitBox, M.pole, 0.06, 2.3, 0.06, s * 1.55, 1.15, t * 1.55); }); });
+        [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.06, 2.8, 0.06, 0, 1.4, pz); rp.push(0, 2.78, pz, 0, 0, pz + (pz > 0 ? 2.2 : -2.2)); });
+        [-1, 1].forEach(function (s) { [-2.3, 2.3].forEach(function (pz) { gm(unitBox, M.pole, 0.05, 1.3, 0.05, s * 2.45, 0.65, pz); rp.push(s * 2.45, 1.3, pz, s * 3.5, 0, pz + (pz > 0 ? 0.8 : -0.8)); }); });
+        rp.push(0, 2.78, -2.3, 0, 2.78, 2.3); ropes(rp);
       }
       return g;
     }
@@ -1326,12 +1397,17 @@
     }
     // 모닥불 (가운데 길 옆 빈터) + 둘러앉는 의자
     var fxp = 7.5, fzp = z1 + 9;
-    for (var st = 0; st < 9; st++) { var a0 = st / 9 * Math.PI * 2, sk = new T.Mesh(rockGeo, CAMP.stone); sk.scale.set(0.2, 0.14, 0.2); add(sk, fxp + Math.cos(a0) * 0.62, gy + 0.08, fzp + Math.sin(a0) * 0.62); }
-    [0.4, 1.5, 2.6].forEach(function (a1) { var lg = ubox(0.12, 0.12, 0.95, CAMP.wood, fxp, gy + 0.12, fzp); lg.rotation.y = a1; });
-    for (var fi = 0; fi < 4; fi++) { var fm = new T.Mesh(flameGeo, CAMP.flame); add(fm, fxp + (r() - 0.5) * 0.3, gy + 0.45, fzp + (r() - 0.5) * 0.3); campFx.flames.push({ m: fm, ph: r() * 6, y: gy + 0.45 }); }
-    var fglow = new T.Sprite(CAMP.flare); fglow.scale.set(3, 3, 1); add(fglow, fxp, gy + 0.7, fzp);
-    if (walk) { var fl0 = new T.PointLight(0xff9a3a, 0, 16, 2); add(fl0, fxp, gy + 1.0, fzp); campFx.light = fl0; }
-    block(fxp, fzp, 0.9); if (RV) RV.fire = { x: fxp, z: fzp };
+    // 화롯대: 네 다리 위 네모 쇠 화로에 장작 몇 개, 숯불과 작은 불꽃 (불빛은 은은하게)
+    var pit = new T.Mesh(new T.CylinderGeometry(0.46, 0.22, 0.24, 4, 1, true), CAMP.steel); pit.rotation.y = Math.PI / 4; add(pit, fxp, gy + 0.5, fzp);
+    var pitB = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 0.02, 4), CAMP.steel); pitB.rotation.y = Math.PI / 4; add(pitB, fxp, gy + 0.385, fzp);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { var lg0 = ubox(0.025, 0.46, 0.025, CAMP.steel, fxp + q[0] * 0.27, gy + 0.2, fzp + q[1] * 0.27); lg0.rotation.set(q[1] * 0.22, 0, -q[0] * 0.22); });
+    var ember = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.03, 10), CAMP.ember); add(ember, fxp, gy + 0.41, fzp);
+    [0.3, 1.4, 2.5].forEach(function (a1, ai) { var lg = new T.Mesh(new T.CylinderGeometry(0.04, 0.045, 0.56, 7), CAMP.wood); lg.rotation.set(Math.PI / 2 - 0.25, a1, 0); add(lg, fxp + Math.sin(a1) * 0.04, gy + 0.5 + ai * 0.02, fzp + Math.cos(a1) * 0.04); });
+    for (var fi = 0; fi < 3; fi++) { var fm = new T.Mesh(flameGeo, CAMP.flame); add(fm, fxp + (r() - 0.5) * 0.16, gy + 0.68, fzp + (r() - 0.5) * 0.16); campFx.flames.push({ m: fm, ph: r() * 6, y: gy + 0.68, k: 0.42 + fi * 0.08 }); }
+    var fglow = new T.Sprite(CAMP.flare); fglow.scale.set(1.1, 1.1, 1); add(fglow, fxp, gy + 0.7, fzp);
+    if (walk) { var fl0 = new T.PointLight(0xff9a3a, 0, 9, 2); add(fl0, fxp, gy + 0.9, fzp); campFx.light = fl0; }
+    for (var wd = 0; wd < 7; wd++) { var wl = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.5, 7), CAMP.wood); wl.rotation.z = Math.PI / 2; add(wl, fxp + 1.35, gy + 0.06 + Math.floor(wd / 3) * 0.1, fzp - 0.9 + (wd % 3) * 0.11 + Math.floor(wd / 3) * 0.05); }   // 옆에 쌓아 둔 장작
+    block(fxp, fzp, 0.75); if (RV) RV.fire = { x: fxp, z: fzp };
     for (var ci = 0; ci < 6; ci++) { var ca = ci / 6 * Math.PI * 2 + 0.3, cx1 = fxp + Math.sin(ca) * 2.1, cz1 = fzp + Math.cos(ca) * 2.1; chair(cx1, cz1, ca + Math.PI, ci % 2 === 1); }
     // 텐트 자리: 가운데 길(|x|<3)과 모닥불 둘레를 피해 줄지어
     // 주차장 (길 쪽 한편에 줄지어) - 차는 텐트 사이에 두지 않는다
@@ -1360,18 +1436,19 @@
     if (RV) RV.rects.push(PD);
     campFx.paddock = { cx: (PD.x0 + PD.x1) / 2, cz: (PD.z0 + PD.z1) / 2, rx: (PD.x1 - PD.x0) / 2 - 2.2, rz: (PD.z1 - PD.z0) / 2 - 2.2, gy: gy };
     campFx.group = parent; addHorses(); addBirds();
-    var spots = [], rowsN = Math.max(2, Math.floor((campZ1 - z1 - 8) / 11));
-    for (var ry0 = 0; ry0 < rowsN; ry0++) for (var sx0 = -hw + 5; sx0 <= hw - 5; sx0 += 9.5) {
-      var tx = sx0 + (r() - 0.5) * 3, tz2 = z1 + 6 + ry0 * 11 + (r() - 0.5) * 3 + (ry0 === 0 ? 0 : 3);
+    var spots = [], rowsN = Math.max(2, Math.floor((campZ1 - z1 - 8) / 9.5));
+    for (var ry0 = 0; ry0 < rowsN; ry0++) for (var sx0 = -hw + 4.5; sx0 <= hw - 4.5; sx0 += 8.2) {
+      var tx = sx0 + (r() - 0.5) * 2, tz2 = z1 + 6 + ry0 * 9.5 + (r() - 0.5) * 2 + (ry0 === 0 ? 0 : 3);
       if (Math.abs(tx) < 4.2 || Math.hypot(tx - fxp, tz2 - fzp) < 6.5 || Math.abs(tz2 - (z1 + 15)) < 3.2) continue;
       if (inRect(PK, tx, tz2, 3.2) || inRect(PD, tx, tz2, 3.4)) continue;   // 주차장·말 방목장 자리는 비운다
       spots.push([tx, tz2]);
     }
     spots.forEach(function (sp, si) {
-      var kind = si % 5 === 4 ? 3 : si % 3, mat = CAMP.tent[Math.floor(r() * CAMP.tent.length)], ry = Math.atan2(-sp[0], z1 + 15 - sp[1]) + (r() - 0.5) * 0.8;
+      var kind = si % 5, light = [0, 1, 5, 6], dark = [2, 3, 4, 7], mat = CAMP.tent[kind === 3 ? 1 : (kind === 2 || kind === 4 ? dark : light)[Math.floor(r() * 4)]], ry = Math.atan2(-sp[0], z1 + 15 - sp[1]) + (r() - 0.5) * 0.8;
       tent(kind, sp[0], sp[1], ry, mat);
-      if (kind >= 2) { table(sp[0], sp[1]); chair(sp[0] - 1.2, sp[1] + 0.9, 1.2, true); chair(sp[0] + 0.3, sp[1] - 1.1, -0.3, false); }
-      if (r() < 0.75) lantern(sp[0] + Math.sin(ry) * 2.8 + 0.6, sp[1] + Math.cos(ry) * 2.8, 1.5 + r() * 0.6);
+      if (kind === 4) { table(sp[0], sp[1]); chair(sp[0] - 1.2, sp[1] + 0.9, 1.2, true); chair(sp[0] + 0.3, sp[1] - 1.1, -0.3, false); }
+      else if (kind === 2) { var ax0 = sp[0] + Math.sin(ry) * 3.6, az0 = sp[1] + Math.cos(ry) * 3.6; chair(ax0 - Math.cos(ry) * 0.7, az0 + Math.sin(ry) * 0.7, ry, true); chair(ax0 + Math.cos(ry) * 0.7, az0 - Math.sin(ry) * 0.7, ry, false); }   // 차양 아래 의자
+      if (r() < 0.75) lantern(sp[0] + Math.sin(ry + 0.9) * 3.9, sp[1] + Math.cos(ry + 0.9) * 3.9, 1.5 + r() * 0.6);
     });
     // 줄 전구 (기둥 사이에 늘어뜨린 작은 전구)
     [[-hw + 3, z1 + 4.5, -6, z1 + 4.5], [5, z1 + 20.5, hw - 4, z1 + 20.5]].forEach(function (ln) {
@@ -1471,7 +1548,7 @@
     waterTex.offset.x = (now / 9000) % 1; waterTex.offset.y = Math.sin(now / 5000) * 0.02;
     for (var i = 0; i < campFx.flames.length; i++) {
       var f = campFx.flames[i], s = 0.75 + Math.sin(now / 90 + f.ph) * 0.2 + Math.sin(now / 37 + f.ph * 2) * 0.1;
-      f.m.scale.set(0.8 + s * 0.3, s, 0.8 + s * 0.3); f.m.position.y = f.y + (s - 0.75) * 0.25;
+      var fk = f.k || 1; f.m.scale.set((0.8 + s * 0.3) * fk, s * fk, (0.8 + s * 0.3) * fk); f.m.position.y = f.y + (s - 0.75) * 0.12;
     }
     var P = campFx.paddock;
     for (var hi = 0; hi < campFx.horses.length; hi++) {   // 말: 울타리 안 타원 길을 따라 달린다
@@ -1489,7 +1566,7 @@
       B.m.rotation.y = Math.atan2(Math.cos(B.a) * B.rad * B.sp, -Math.sin(B.a) * B.rad * 0.7 * B.sp);
       B.m.rotation.z = -0.25 * (B.sp > 0 ? 1 : -1);   // 도는 쪽으로 살짝 기울인다
     }
-    if (campFx.light) campFx.light.intensity = campFx.night * (1.5 + Math.sin(now / 110) * 0.25 + Math.sin(now / 43) * 0.15);
+    if (campFx.light) campFx.light.intensity = campFx.night * (0.75 + Math.sin(now / 160) * 0.08 + Math.sin(now / 67) * 0.05);   // 은은하게
   }
   // ── 1층 출입문 + 바깥 앞마당 (도서관 밖으로 나가 보기) ──
   var DOOR_W = 3.6, DOOR_H = 2.9, PLAZA_D = 9, autoDoor = null, CINE_WALL = null;
