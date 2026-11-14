@@ -15,6 +15,9 @@
 
 | 문서 | 내용 |
 |---|---|
+| 📦 [docs/install-venv.md](docs/install-venv.md) | **가상환경 설치 (권장)** - 패키지 → `.env` → 점검·실행 → systemd → 업데이트·백업·문제 해결 |
+| 🐳 [docs/install-docker.md](docs/install-docker.md) | **도커 설치** - Docker Compose, 책 폴더 같은 경로·컨테이너 안 주소 주의 |
+| ⚙️ [docs/setup-guide.md](docs/setup-guide.md) | **설정 가이드** - 화면 그림과 함께 로비·움직이기·서재 설정 창(보관함·AI·인물·창밖·모형·AI 직원)·계정 |
 | [docs/guide.md](docs/guide.md) | 설치·설정·쓰는 법·코너별 안내·`.env` 전체 목록·배포(도커·프록시·백업·보안)·문제 해결 |
 | [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 내역 (화면 [설정 > 변경 내역]에서도) |
 | [env.example](env.example) | 설정 예시 (주석 포함) |

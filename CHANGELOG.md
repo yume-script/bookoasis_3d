@@ -8,6 +8,11 @@ BookOasis 3D 서재(bookoasis_3d)의 버전별 변경 사항입니다. 새 버�
 
 ---
 
+## 2.62.2
+
+- **설치·설정 가이드**: `docs/install-venv.md`(가상환경 설치 → systemd → 옮기기·업데이트·백업·https·문제 해결), `docs/install-docker.md`(Docker Compose - 책 폴더 같은 경로·컨테이너 주소 주의), `docs/setup-guide.md`(화면 그림과 함께 로비·움직이기·서재 설정 창 탭마다·계정·선택 기능)
+- 도커 파일: `Dockerfile`(edge-tts 포함), `docker-compose.example.yml`, `.dockerignore`
+
 ## 2.62.1
 
 - 브라우저 탭 아이콘(파비콘)과 왼쪽 위 로고의 글자를 `P`에서 **`3D`** 로
