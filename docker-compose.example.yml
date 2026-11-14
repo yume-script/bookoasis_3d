@@ -1,0 +1,24 @@
+# cp docker-compose.example.yml docker-compose.yml 후 고쳐서 씁니다 (docs/install-docker.md 참고)
+services:
+  bookoasis_3d:
+    build: .
+    container_name: bookoasis_3d
+    restart: unless-stopped
+    stop_grace_period: 20s
+    # env_file은 쓰지 않는다: [AI 설정] 화면에서 저장하면 마운트한 .env 파일에 쓰기 때문
+    # (여기 environment에 적은 키는 .env보다 우선하므로 화면에서 바꿀 값은 적지 말 것)
+    environment:
+      DATA_DIR: /data
+      WEB_HOST: 0.0.0.0           # 외부에 열므로 .env에 WEB_USER/WEB_PASSWORD 필수
+      TZ: Asia/Seoul              # 창밖 시간(낮·밤)·서재 소식 시각
+    volumes:
+      - ./data:/data              # 계정·서재 설정·AI 직원 기억·표지 캐시 (백업 대상)
+      - ./.env:/app/.env          # 설정 파일 (먼저 cp env.example .env)
+      # 여기서 읽기·듣기·보기: BookOasis 보관함 폴더를 BookOasis와 "같은 경로"로 (읽기 전용이면 충분)
+      - /mnt/library:/mnt/library:ro,rslave
+      # BookOasis가 SQLite면 DB 파일 폴더도 (MySQL/MariaDB면 필요 없음)
+      # - /opt/bookoasis/db:/opt/bookoasis/db:ro
+    ports:
+      - "5932:5932"
+    # BookOasis DB·BookOasis·YMPlayer가 이 서버의 127.0.0.1에만 열려 있으면 호스트 네트워크가 가장 간단 (그때 ports:는 지움)
+    # network_mode: host
