@@ -5008,7 +5008,8 @@
       .then(function (d) {
         if (!d.success) return;
         syncRemotes(d.others || []);
-        if (STAFF_ON) syncStaff(d.staff);
+        // AI 직원이 없어도(AI 설정 전) 배달은 보인다 - 예전엔 AI 직원이 켜져 있을 때만 배달원·배달 로봇이 나왔다
+        if (STAFF_ON) syncStaff(d.staff); else if (d.staff) syncStaff({ agents: [], deliveries: (d.staff.deliveries || []).filter(function (s) { return s.kind === 'courier'; }) }, true);
         MYKEY = d.me || MYKEY; onlineList = d.online || []; onlineChip();
         (d.chat || []).forEach(function (m) { if (m.id > chatSince) chatLine(m); });
         chatSince = Math.max(chatSince, d.chat_id || 0);
@@ -6005,7 +6006,7 @@
     p.tag = nameTag(s.job ? s.name + ' · ' + s.job : s.name, msg, s.kind === 'guest' ? '#ffcf7a' : s.kind === 'courier' ? '#ff9f6b' : s.kind === 'discord' ? '#a5b4ff' : s.post === 'office' ? '#ffd166' : (s.post === 'gallery' || s.post === 'jazz') ? '#9fd3ff' : '#7ee0c3');
     p.tag.position.y = 2.15 + (msg ? 0.2 : 0); p.g.add(p.tag);
   }
-  function syncStaff(d) {
+  function syncStaff(d, deliveriesOnly) {
     if (!d || !floorGroup || !layout) return;
     staffData = (d.agents || []).concat(cur === 0 ? d.deliveries || [] : []);   // 배달원·디스코드 손님은 1층에만 (배달원은 안내 데스크로, 디스코드 손님은 라운지로)
     Object.keys(staffNPC).forEach(function (k) {   // 나간 손님(목록에서 빠진 사람)은 지운다
@@ -6020,6 +6021,11 @@
       }
       var p = staffNPC[s.id];
       if (p && p.g.parent !== floorGroup) { disposeGroup(p.g); p = null; }
+      // 로봇 모형을 받기 전에 사람 배달원으로 나온 배달은, 모형이 오면 (아직 오는 중일 때) 로봇으로 바꿔 사무실에서 다시 출발
+      if (p && s.kind === 'courier' && !p.courierBot && s.target === 'entrance' && !p.visitedDesk && courierRobot(s)) {
+        if (p.g.parent) p.g.parent.remove(p.g); disposeGroup(p.g); delete staffNPC[s.id]; p = null;
+      }
+      if (p && s.kind === 'courier' && s.target === 'desk') p.visitedDesk = true;
       if (!p) { p = staffNPC[s.id] = makeStaff(s); p.fresh = true; }
       var pos = null, face = null;
       if (s.target === 'book' && s.book) {
@@ -6055,7 +6061,7 @@
       if (tagKey !== (p.lastSay || '|')) { p.lastSay = tagKey; setStaffTag(p, s, say); }   // 말이나 하는 일이 바뀌면 이름표를 다시
     });
     if (pointer && !staffData.some(function (s) { return s.kind !== 'guest' && s.target === 'book' && s.book === pointer.key; })) hidePointer();
-    drawBoard(d.board || {}, d.log || []);
+    if (!deliveriesOnly) drawBoard(d.board || {}, d.log || []);
   }
   function updateStaff(p, dt, now) {
     if (p.route && p.route.length) {   // 거쳐 갈 곳 (배달 로봇: 사무실 문 → 서재 입구 → …): 가까워지면 다음 곳으로
