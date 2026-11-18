@@ -6122,40 +6122,159 @@
     var sign = new T.Mesh(new T.BoxGeometry(3.4, 0.6, 0.04), [M.black, M.black, M.black, M.black, signMat, signMat]);
     sign.position.set((sp.x0 + sp.x1) / 2, 3.35, f - 2.2); parent.add(sign);
     [-1.5, 1.5].forEach(function (o) { var c = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, CEIL - 3.65, 6), M.black); c.position.set((sp.x0 + sp.x1) / 2 + o, (CEIL + 3.65) / 2, f - 2.2); parent.add(c); });
-    var floorMat = new T.Mesh(new T.PlaneGeometry(sp.x0 - sp.x1 + 2.2, 3.6), new T.MeshStandardMaterial({ color: 0x1b1530, roughness: 0.9 }));
+    var floorMat = new T.Mesh(new T.PlaneGeometry(sp.x0 - sp.x1 + 2.2, 3.6), new T.MeshStandardMaterial({ map: arcadeCarpet(), roughness: 0.95, userData: { keep: true } }));
     floorMat.rotation.x = -Math.PI / 2; floorMat.position.set((sp.x0 + sp.x1) / 2, 0.011, f - 1.9); floorMat.receiveShadow = true; parent.add(floorMat);
-    ARCADE.slice(0, sp.n).forEach(function (gm, i) {
-      var x = sp.x0 - i * sp.step, col = ARC_COLORS[i % ARC_COLORS.length];
-      var g = new T.Group(); g.position.set(x, 0, f - 0.75); g.rotation.y = Math.PI; parent.add(g);   // 로비 쪽(-z)을 보고
-      var body = new T.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.1 });
-      var dark = new T.MeshStandardMaterial({ color: 0x15151a, roughness: 0.6 });
-      var base = new T.Mesh(unitBox, body); base.scale.set(0.82, 0.95, 0.72); base.position.set(0, 0.475, 0); g.add(base);
-      var upper = new T.Mesh(unitBox, body); upper.scale.set(0.82, 0.95, 0.42); upper.position.set(0, 1.4, -0.15); g.add(upper);
-      var panel = new T.Mesh(unitBox, dark); panel.scale.set(0.8, 0.06, 0.34); panel.position.set(0, 1.0, 0.24); panel.rotation.x = 0.25; g.add(panel);
-      var stick = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.12, 8), M.black); stick.position.set(-0.18, 1.08, 0.26); g.add(stick);
-      var ball = new T.Mesh(new T.SphereGeometry(0.035, 12, 10), new T.MeshStandardMaterial({ color: 0xd62839, roughness: 0.3 })); ball.position.set(-0.18, 1.15, 0.26); g.add(ball);
-      [0.05, 0.15, 0.25].forEach(function (bx, k) { var bt = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, 0.02, 12), new T.MeshBasicMaterial({ color: [0xffd166, 0x06d6a0, 0xef476f][k] })); bt.position.set(bx, 1.06, 0.27); bt.rotation.x = 0.25; g.add(bt); });
-      var scrTex = canvasTex(400, 320, function (c, w, h) {
-        var grd = c.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#0d0b1e'); grd.addColorStop(1, '#241a4a'); c.fillStyle = grd; c.fillRect(0, 0, w, h);
-        c.fillStyle = 'rgba(255,255,255,0.06)'; for (var yy = 0; yy < h; yy += 4) c.fillRect(0, yy, w, 1);   // 주사선
-        c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#ffd166'; c.font = '700 40px ' + FONT; wrapText(c, gm.name, 22, 90, w - 44, 50, 2);
-        c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillStyle = '#7ee0c3'; c.font = '700 26px ' + FONT; c.fillText('PRESS START', w / 2, 262);
-      });
-      var scr = new T.Mesh(new T.PlaneGeometry(0.66, 0.53), new T.MeshBasicMaterial({ map: scrTex, toneMapped: false }));
-      scr.position.set(0, 1.45, 0.075); scr.rotation.x = -0.12; g.add(scr);
-      var mq = canvasTex(400, 90, function (c, w, h) { c.fillStyle = '#ff4fd8'; c.fillRect(0, 0, w, h); c.fillStyle = '#14121c'; c.font = '800 44px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(gm.name.replace(/\s*\(.*\)$/, ''), w / 2, h / 2 + 2, w - 20); });
-      var marquee = new T.Mesh(new T.PlaneGeometry(0.8, 0.18), new T.MeshBasicMaterial({ map: mq, toneMapped: false })); marquee.position.set(0, 1.97, 0.07); g.add(marquee);
-      var mbox = new T.Mesh(unitBox, dark); mbox.scale.set(0.84, 0.22, 0.5); mbox.position.set(0, 1.97, -0.17); g.add(mbox);
-      g.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.userData.arcade = gm.id; brunchHits.push(o); } });
-      // 앞 의자 (앉으면 그 게임)
-      var st = new T.Group(); st.position.set(x, 0, f - 1.75); parent.add(st);
-      var seat = new T.Mesh(new T.CylinderGeometry(0.2, 0.2, 0.08, 18), dark); seat.position.y = 0.62; st.add(seat);
-      var leg = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.6, 8), M.pole); leg.position.y = 0.3; st.add(leg);
-      var foot = new T.Mesh(new T.CylinderGeometry(0.2, 0.22, 0.03, 18), M.pole); foot.position.y = 0.015; st.add(foot);
-      addSeat(x, f - 1.75, 0, 0.62, { arcade: gm.id });   // 오락기(+z)를 보고
+    var glow = new T.PointLight(0x8a5cff, 0.7, 7, 2); glow.position.set((sp.x0 + sp.x1) / 2, 1.6, f - 1.6); parent.add(glow);   // 화면 불빛이 바닥·의자에 번진다
+    ARCADE.slice(0, sp.n).forEach(function (gm, i) { buildCabinet(gm, i, sp.x0 - i * sp.step, f); });
+  }
+  // 오락실 카펫 (어두운 바탕에 형광 무늬 - 오락실 바닥 느낌)
+  var arcCarpetTex = null;
+  function arcadeCarpet() {
+    if (arcCarpetTex) return arcCarpetTex;
+    arcCarpetTex = canvasTex(256, 256, function (c, w, h) {
+      c.fillStyle = '#120f24'; c.fillRect(0, 0, w, h);
+      for (var k = 0; k < 900; k++) { c.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.05) + ')'; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); }   // 카펫 올
+      var cols = ['#ff4fd8', '#3ad6ff', '#ffd166', '#7cff6b'];
+      for (var j = 0; j < 26; j++) {
+        c.strokeStyle = cols[j % 4]; c.globalAlpha = 0.55; c.lineWidth = 2;
+        var x = Math.random() * w, y = Math.random() * h, r = 4 + Math.random() * 9;
+        c.beginPath();
+        if (j % 3 === 0) c.arc(x, y, r, 0, Math.PI * 2);
+        else if (j % 3 === 1) { c.moveTo(x - r, y); c.lineTo(x, y - r); c.lineTo(x + r, y); }
+        else { c.moveTo(x - r, y - r / 2); c.quadraticCurveTo(x, y + r, x + r, y - r / 2); }
+        c.stroke();
+      }
+      c.globalAlpha = 1;
+    }, [4, 2]);
+    return arcCarpetTex;
+  }
+  // 오락기 옆판 단면 (z: 앞(+)·뒤(-), y: 높이) - 옛 오락실 업라이트 오락기 모양
+  var CAB_PROFILE = [[-0.36, 0], [0.36, 0], [0.36, 0.9], [0.45, 0.96], [0.45, 1.0], [0.2, 1.07], [0.13, 1.1], [0.0, 1.76], [0.1, 1.78], [0.1, 2.02], [-0.36, 2.02]];
+  var cabSideGeo = null;
+  function cabSide() {
+    if (cabSideGeo) return cabSideGeo;
+    var sh = new T.Shape(); CAB_PROFILE.forEach(function (q, k) { if (k) sh.lineTo(q[0], q[1]); else sh.moveTo(q[0], q[1]); });
+    cabSideGeo = new T.ExtrudeGeometry(sh, { depth: 0.022, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.006, bevelSegments: 2 });
+    cabSideGeo.rotateY(-Math.PI / 2);   // 단면의 z(앞뒤)가 오락기 앞뒤, 두께는 -x 쪽으로
+    cabSideGeo.userData.shared = true;
+    return cabSideGeo;
+  }
+  function hexCss(col) { return '#' + ('000000' + col.toString(16)).slice(-6); }
+  function buildCabinet(gm, i, x, f) {
+    var col = ARC_COLORS[i % ARC_COLORS.length], css = hexCss(col);
+    var g = new T.Group(); g.position.set(x, 0, f - 0.75); g.rotation.y = Math.PI; parent.add(g);   // 로비 쪽(-z)을 보고
+    var lam = new T.MeshStandardMaterial({ color: 0x141418, roughness: 0.38, metalness: 0.05 });   // 검은 멜라민 합판
+    var trim = new T.MeshStandardMaterial({ color: col, roughness: 0.28, metalness: 0.15 });        // 테두리 T몰딩
+    var metal = new T.MeshStandardMaterial({ color: 0x9a9ea6, roughness: 0.32, metalness: 0.85 });
+    var black = new T.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.7 });
+    // 옆판 그림 (게임 색 띠 + 이름)
+    var art = canvasTex(256, 640, function (c, w, h) {
+      c.fillStyle = '#101014'; c.fillRect(0, 0, w, h);
+      var gr = c.createLinearGradient(0, h, w, 0); gr.addColorStop(0, css); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(0, h); c.lineTo(w, h * 0.42); c.lineTo(w, h * 0.62); c.lineTo(0, h); c.fill();
+      c.strokeStyle = css; c.lineWidth = 5; c.globalAlpha = 0.85;
+      for (var k = 0; k < 3; k++) { c.beginPath(); c.moveTo(0, h * (0.78 - k * 0.06)); c.lineTo(w, h * (0.3 - k * 0.06)); c.stroke(); }
+      c.globalAlpha = 1; c.save(); c.translate(w * 0.62, h * 0.32); c.rotate(-Math.PI / 2);
+      c.fillStyle = 'rgba(255,255,255,0.85)'; c.font = '800 30px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(gm.name.replace(/\s*\(.*\)$/, ''), 0, 0, h * 0.5); c.restore();
     });
+    art.wrapS = art.wrapT = T.ClampToEdgeWrapping; art.repeat.set(1 / 0.81, 1 / 2.02); art.offset.set(0.36 / 0.81, 0);
+    var artMat = new T.MeshStandardMaterial({ map: art, roughness: 0.4, metalness: 0.05 });
+    [-0.38, 0.4].forEach(function (sx) { var sd = new T.Mesh(cabSide(), [artMat, trim]); sd.position.x = sx; g.add(sd); });
+    function box(mat, w, h, d, px, py, pz, rx) { var m = new T.Mesh(unitBox, mat); m.scale.set(w, h, d); m.position.set(px, py, pz); if (rx) m.rotation.x = rx; g.add(m); return m; }
+    box(lam, 0.76, 0.9, 0.72, 0, 0.45, 0);                 // 아래 몸통 (동전 문)
+    box(lam, 0.76, 1.12, 0.34, 0, 1.46, -0.19);            // 위 몸통 (모니터 뒤)
+    box(lam, 0.76, 0.1, 0.16, 0, 1.06, 0.12);              // 조작판 뒤 받침
+    box(lam, 0.76, 0.05, 0.16, 0, 1.765, 0.03);            // 화면 위 차양
+    box(black, 0.74, 0.07, 0.02, 0, 0.035, 0.365);         // 발판(킥 플레이트)
+    // 동전 문: 철판 + 동전 투입구 (빨간 불) + 열쇠 구멍
+    box(metal, 0.3, 0.4, 0.012, 0, 0.5, 0.366);
+    [-0.065, 0.065].forEach(function (cx) {
+      box(black, 0.07, 0.11, 0.01, cx, 0.6, 0.374);
+      var lit = new T.Mesh(new T.PlaneGeometry(0.05, 0.08), new T.MeshBasicMaterial({ color: 0xff2a2a, toneMapped: false })); lit.position.set(cx, 0.6, 0.38); g.add(lit);
+      box(black, 0.008, 0.035, 0.004, cx, 0.6, 0.383);
+    });
+    var key = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.01, 12), metal); key.rotation.x = Math.PI / 2; key.position.set(0, 0.42, 0.375); g.add(key);
+    box(black, 0.22, 0.02, 0.006, 0, 0.36, 0.374);         // 반환구
+    // 조작판 (앞이 낮게 기울고 레버·버튼)
+    var cp = new T.Group(); cp.position.set(0, 1.0, 0.33); cp.rotation.x = 0.28; g.add(cp);
+    var cpTex = canvasTex(256, 96, function (c, w, h) {
+      c.fillStyle = '#1a1a20'; c.fillRect(0, 0, w, h);
+      c.fillStyle = css; c.globalAlpha = 0.9; c.fillRect(0, h - 10, w, 10); c.fillRect(0, 0, w, 4); c.globalAlpha = 1;
+      c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = '700 12px ' + FONT; c.fillText('1 PLAYER', 14, 18); c.fillText('2 PLAYERS', w - 80, 18);
+    });
+    var top = new T.Mesh(unitBox, [lam, lam, new T.MeshStandardMaterial({ map: cpTex, roughness: 0.3 }), lam, black, lam]);
+    top.scale.set(0.8, 0.05, 0.28); top.position.y = -0.025; cp.add(top);
+    var trimFront = new T.Mesh(unitBox, trim); trimFront.scale.set(0.8, 0.055, 0.012); trimFront.position.set(0, -0.025, 0.142); cp.add(trimFront);
+    // 레버: 먼지 덮개 + 축 + 공
+    var dust = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.004, 16), black); dust.position.set(-0.2, 0.002, 0.02); cp.add(dust);
+    var shaft = new T.Mesh(new T.CylinderGeometry(0.007, 0.007, 0.075, 8), metal); shaft.position.set(-0.2, 0.04, 0.02); cp.add(shaft);
+    var ball = new T.Mesh(new T.SphereGeometry(0.03, 20, 14), new T.MeshStandardMaterial({ color: 0xd62839, roughness: 0.18 })); ball.position.set(-0.2, 0.09, 0.02); cp.add(ball);
+    // 버튼 6개 (두 줄, 살짝 휘게) - 바깥 링 + 오목한 누름판
+    var bcol = [0xef476f, 0xffd166, 0x06d6a0, 0x3a86ff, 0xff7f11, 0xf1f1f1];
+    [[-0.04, 0.045], [0.04, 0.035], [0.12, 0.045], [-0.04, -0.03], [0.04, -0.04], [0.12, -0.03]].forEach(function (q, k) {
+      var bm = new T.MeshStandardMaterial({ color: bcol[k], roughness: 0.22 });
+      var ring = new T.Mesh(new T.CylinderGeometry(0.024, 0.024, 0.01, 18), bm); ring.position.set(q[0], 0.005, q[1]); cp.add(ring);
+      var push = new T.Mesh(new T.CylinderGeometry(0.018, 0.018, 0.012, 18), bm); push.position.set(q[0], 0.009, q[1]); cp.add(push);
+    });
+    [[-0.05, 'START'], [0.05, '']].forEach(function (q) {   // 시작 버튼 (뒤쪽, 불 들어옴)
+      var sb = new T.Mesh(new T.BoxGeometry(0.03, 0.01, 0.02), new T.MeshBasicMaterial({ color: 0xfff1a8, toneMapped: false })); sb.position.set(q[0] + 0.25, 0.005, -0.09); cp.add(sb);
+    });
+    // 화면: 테두리(베젤) → 브라운관 화면 → 유리 (기울어진 면)
+    var sl = Math.atan2(0.13, 0.66), cy = 1.43, cz = 0.065;
+    var bezelTex = canvasTex(256, 220, function (c, w, h) {
+      c.fillStyle = '#060608'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = css; c.lineWidth = 3; c.globalAlpha = 0.6; c.strokeRect(14, 12, w - 28, h - 24); c.globalAlpha = 1;
+    });
+    var bezel = new T.Mesh(new T.PlaneGeometry(0.76, 0.67), new T.MeshStandardMaterial({ map: bezelTex, roughness: 0.5 }));
+    bezel.position.set(0, cy, cz); bezel.rotation.x = -sl; g.add(bezel);
+    var scrTex = canvasTex(400, 320, function (c, w, h) {
+      c.imageSmoothingEnabled = false;
+      c.fillStyle = '#04030c'; c.fillRect(0, 0, w, h);
+      for (var k = 0; k < 70; k++) { c.fillStyle = ['#ffffff', '#7ee0c3', '#ffd166'][k % 3]; c.globalAlpha = 0.3 + Math.random() * 0.6; c.fillRect((Math.random() * w) | 0, (Math.random() * h) | 0, 2, 2); }
+      c.globalAlpha = 1;
+      c.fillStyle = '#ff4f6d'; c.font = '700 16px monospace'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText('1UP', 20, 12); c.fillText('HI-SCORE', w / 2 - 40, 12);
+      c.fillStyle = '#ffffff'; c.fillText('000000', 20, 30); c.fillText(('0' + (50000 + i * 7350)).slice(-6), w / 2 - 30, 30);
+      c.fillStyle = '#ffd166'; c.font = '800 38px ' + FONT; c.shadowColor = css; c.shadowBlur = 14; wrapText(c, gm.name, 22, 96, w - 44, 48, 2); c.shadowBlur = 0;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = '#7ee0c3'; c.font = '700 24px monospace'; c.fillText('INSERT COIN', w / 2, 248);
+      c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = '14px monospace'; c.fillText('CREDIT 0', w / 2, 290);
+      c.fillStyle = 'rgba(0,0,0,0.28)'; for (var yy = 0; yy < h; yy += 3) c.fillRect(0, yy, w, 1);   // 주사선
+      var vg = c.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.85); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.75)');
+      c.fillStyle = vg; c.fillRect(0, 0, w, h);   // 브라운관 가장자리 어둡게
+    });
+    // 브라운관처럼 가운데가 살짝 볼록한 화면
+    var crtGeo = new T.PlaneGeometry(0.6, 0.48, 12, 10), pa = crtGeo.attributes.position;
+    for (var v = 0; v < pa.count; v++) { var ux = pa.getX(v) / 0.3, uy = pa.getY(v) / 0.24; pa.setZ(v, 0.018 * (1 - Math.min(1, (ux * ux + uy * uy) / 2))); }
+    crtGeo.computeVertexNormals();
+    var scr = new T.Mesh(crtGeo, new T.MeshBasicMaterial({ map: scrTex, toneMapped: false })); scr.position.set(0, cy + 0.01, cz + 0.002); scr.rotation.x = -sl; g.add(scr);
+    var glass = new T.Mesh(new T.PlaneGeometry(0.74, 0.65), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, metalness: 1, transparent: true, opacity: 0.14, depthWrite: false }));
+    glass.position.set(0, cy, cz + 0.03); glass.rotation.x = -sl; glass.userData.noShadow = true; g.add(glass);
+    // 위 간판(마키): 뒤에서 불 켜진 그림 + 크롬 띠
+    var mq = canvasTex(512, 128, function (c, w, h) {
+      var gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#1b0f2e'); gr.addColorStop(0.5, css); gr.addColorStop(1, '#1b0f2e');
+      c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = '900 58px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.shadowColor = '#000'; c.shadowBlur = 8; c.lineWidth = 6; c.strokeStyle = '#14121c';
+      var nm = gm.name.replace(/\s*\(.*\)$/, '');
+      c.strokeText(nm, w / 2, h / 2 + 3, w - 30); c.fillText(nm, w / 2, h / 2 + 3, w - 30);
+    });
+    var marquee = new T.Mesh(new T.PlaneGeometry(0.76, 0.2), new T.MeshBasicMaterial({ map: mq, toneMapped: false })); marquee.position.set(0, 1.9, 0.102); g.add(marquee);
+    box(lam, 0.76, 0.24, 0.12, 0, 1.9, 0.04);
+    box(metal, 0.78, 0.014, 0.02, 0, 2.005, 0.105); box(metal, 0.78, 0.014, 0.02, 0, 1.795, 0.105);
+    box(lam, 0.82, 0.02, 0.84, 0, 2.03, -0.03);           // 지붕판
+    g.traverse(function (o) { if (o.isMesh) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; o.userData.arcade = gm.id; brunchHits.push(o); } });
+    // 앞 의자 (앉으면 그 게임): 크롬 다리 + 푹신한 비닐 방석
+    var st = new T.Group(); st.position.set(x, 0, f - 1.75); parent.add(st);
+    var vinyl = new T.MeshStandardMaterial({ color: col, roughness: 0.42 });
+    var seat = new T.Mesh(new T.CylinderGeometry(0.19, 0.2, 0.07, 24), vinyl); seat.position.y = 0.6; st.add(seat);
+    var pad = new T.Mesh(new T.SphereGeometry(0.19, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2), vinyl); pad.scale.y = 0.18; pad.position.y = 0.635; st.add(pad);
+    var rim = new T.Mesh(new T.TorusGeometry(0.195, 0.012, 8, 32), metal); rim.rotation.x = Math.PI / 2; rim.position.y = 0.6; st.add(rim);
+    var leg = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.56, 12), metal); leg.position.y = 0.29; st.add(leg);
+    var ring2 = new T.Mesh(new T.TorusGeometry(0.15, 0.01, 8, 28), metal); ring2.rotation.x = Math.PI / 2; ring2.position.y = 0.25; st.add(ring2);   // 발걸이
+    var foot = new T.Mesh(new T.CylinderGeometry(0.17, 0.21, 0.035, 24), metal); foot.position.y = 0.018; st.add(foot);
+    st.traverse(function (o) { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    addSeat(x, f - 1.75, 0, 0.62, { arcade: gm.id });   // 오락기(+z)를 보고
   }
   function openArcade(id) {
     var gm = ARCADE.filter(function (g) { return g.id === id; })[0] || ARCADE[0]; if (!gm) return;
