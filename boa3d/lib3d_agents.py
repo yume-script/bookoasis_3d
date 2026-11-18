@@ -973,7 +973,7 @@ def _deliveries():
         return []
     s = lib3d_events.settings()
     name = d["from"] or s["name"]
-    if d["elapsed"] >= 10 and lib3d_events.first_arrival(d):
+    if d["elapsed"] >= lib3d_events.ARRIVE + 2 and lib3d_events.first_arrival(d):
         text = lib3d_events.summary(d["items"])
         lib3d_presence.post("%s (배달)" % name, "📦 " + (d["note"] or text + " 왔습니다!"), _ground_floor(), src="delivery")
         add_log("delivery", "배달 도착", (d["note"] + " · " if d["note"] else "") + text, name=name)

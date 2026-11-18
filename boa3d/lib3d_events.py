@@ -21,7 +21,9 @@ KEEP = 300            # 파일에 남길 줄 수
 SHOW_SEC = 6 * 3600   # 이보다 오래된 배달은 화면에 보내지 않는다 (서버를 오래 꺼 두었다 켜도 몰려오지 않게)
 GROUP_SEC = 90        # 웹툰 회차가 이 간격 안에 이어 오면 한 상자로
 QUIET_SEC = 20        # 마지막 회차 뒤 이만큼 잠잠하면 출발
-DUR = 52              # 배달 한 번 (입구 8초 → 데스크 30초 → 나감 14초)
+DUR = 66              # 배달 한 번 (길 건너 사무실에서 걸어와 입구까지 16초 → 데스크 28초 → 사무실로 돌아감 22초)
+ARRIVE = 16           # 이만큼 지나면 데스크로
+LEAVE = 44            # 이만큼 지나면 나간다
 KINDS = {"book": "책", "webtoon": "웹툰", "video": "영상", "audio": "오디오북", "comic": "만화"}
 _LOCK = threading.Lock()
 _CACHE = {"sig": None, "rows": []}
@@ -175,8 +177,8 @@ def active(now=None):
         el = now - d["start"]
         if 0 <= el < DUR:
             d["elapsed"] = el
-            d["target"] = "desk" if 8 <= el < 38 else "entrance"
-            d["say"] = (d["note"] or ("%s 왔습니다! 데스크에 둘게요." % summary(d["items"]))) if 10 <= el < 22 else ""
+            d["target"] = "desk" if ARRIVE <= el < LEAVE else "entrance"
+            d["say"] = (d["note"] or ("%s 왔습니다! 데스크에 둘게요." % summary(d["items"]))) if ARRIVE + 4 <= el < ARRIVE + 16 else ""
             return d
     return None
 

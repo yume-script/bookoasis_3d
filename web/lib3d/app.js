@@ -4507,7 +4507,7 @@
     base.appendChild(labeled('자율 업무 - 이용자가 없어도 직원은 정해진 주기로 혼자 일하고, AI 손님도 찾아옴',
       staffInput('input', d.config.autonomous, { type: 'checkbox', 'data-k': 'autonomous' })));
     var dl = d.config.delivery || {}, dfs = section('기본·배달', 'card'); dfs.dataset.delivery = '1';
-    h4(dfs, '배달 - 책·영상·웹툰이 들어오면 배달원이 1층 안내 데스크로');
+    h4(dfs, '배달 - 책·영상·웹툰이 들어오면 로봇이 길 건너 사무실에서 1층 안내 데스크로 (사무실이 없으면 배달원이 입구에서)');
     dfs.appendChild(labeled('배달 받기', staffInput('input', dl.enabled !== false, { type: 'checkbox', 'data-d': 'enabled' })));
     dfs.appendChild(labeled('웹툰 다운로더(BookOasis Assistant)가 보낸 회차도 (잠잠해질 때까지 모아 한 상자로)', staffInput('input', dl.webtoon !== false, { type: 'checkbox', 'data-d': 'webtoon' })));
     dfs.appendChild(labeled('배달원 이름 (바깥 프로그램이 이름을 보내면 그 이름)', staffInput('input', dl.name || '배달원', { type: 'text', 'data-d': 'name' })));
@@ -5967,20 +5967,40 @@
     return null;
   }
   function bookByKey(key) { return books.filter(function (b) { return b.key === key && b.mesh && b.kind !== 'banner'; })[0]; }
+  // 배달 로봇: 책·영상이 들어오면 길 건너 사무실(애순이 자리 옆)에서 로봇이 상자를 들고 서재 입구 → 안내 데스크로 걸어와
+  // 내려놓고 다시 사무실로 돌아간다. 로봇 모형(RobotExpressive)과 사무실이 있을 때만 - 없으면 예전처럼 배달원이 입구에서 들어온다
+  function courierRobot(s) {
+    return s.kind === 'courier' && HUMAN.robot && OFFICE && OFFICE.door && OFFICE.chief && placePos('entrance');
+  }
+  function officeSpot() {   // 사무실 안, 애순이 자리 앞 (로봇이 상자를 받아 나서는 곳)
+    var c = OFFICE.chief, d = OFFICE.door;
+    return [c.x + (d.x - c.x) * 0.35, c.z + (d.z - c.z) * 0.35 + 0.6];
+  }
+  function courierRoute(p, s) {   // 서버가 정한 단계(입구 → 데스크 → 입구로 나감)를 사무실을 거치는 길로
+    var ent = placePos('entrance'), door = [OFFICE.door.x, OFFICE.door.z], inside = officeSpot();
+    var phase = s.target === 'desk' ? 'desk' : (p.visited ? 'out' : 'in');
+    if (phase === p.leg) return;
+    p.leg = phase;
+    if (phase === 'in') { p.route = [door, [ent[0], ent[1]]]; p.goal = [ent[0], ent[1], ent[2]]; }
+    else if (phase === 'desk') { p.visited = true; var q = placePos('desk'); p.goal = [q[0], q[1], q[2]]; p.waved = false; }   // 아직 오는 중이면 남은 길(입구)을 지나서
+    else { p.route = [[ent[0], ent[1]], door, inside]; p.goal = [inside[0], inside[1], OFFICE.chief.rot + Math.PI]; }
+  }
   function makeStaff(s) {
-    var p = makePerson(5000 + s.look * 37);
+    var robo = courierRobot(s);
+    var p = robo ? robotHuman(rnd(7000 + s.look * 37)) : makePerson(5000 + s.look * 37);
     p.kind = 'agent'; p.walkW = 0; p.staffId = s.id;
     p.tag = null; setStaffTag(p, s, '');
     var home = placePos(s.post) || placePos('lobby');
+    if (robo) { var o = officeSpot(); home = [o[0], o[1], Math.atan2(OFFICE.door.x - o[0], OFFICE.door.z - o[1])]; p.courierBot = true; }
     p.g.position.set(home[0], 0, home[1]); p.g.rotation.y = home[2];
     p.tx = home[0]; p.tz = home[1]; p.face = home[2];
     floorGroup.add(p.g); dimEnv(p.g);
-    if (p.mixer) setLook(p, 'calm');
-    if (s.kind === 'courier') {   // 두 손으로 든 택배 상자
+    if (p.mixer && !robo) setLook(p, 'calm');
+    if (s.kind === 'courier') {   // 두 손으로 든 택배 상자 (로봇은 키가 작아 가슴 높이를 낮춘다)
       var bx = new T.Group(), cb = new T.Mesh(unitBox, new T.MeshStandardMaterial({ color: 0xb8865a, roughness: 0.9 }));
       cb.scale.set(0.5, 0.36, 0.38); bx.add(cb);
       var tp = new T.Mesh(unitBox, new T.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.7 })); tp.scale.set(0.51, 0.02, 0.08); tp.position.y = 0.18; bx.add(tp);
-      bx.position.set(0, 1.05, 0.36); p.g.add(bx);
+      bx.position.set(0, robo ? 0.72 : 1.05, robo ? 0.3 : 0.36); p.g.add(bx); p.box = bx;
     }
     return p;
   }
@@ -6032,7 +6052,8 @@
         }
         if (p.fresh) { p.fresh = false; if (hasOffice && !s.where) p.g.position.set(OFFICE.door.x, 0, OFFICE.door.z); else if (pos) p.g.position.set(pos[0], 0, pos[1]); }   // 위치를 아는 사람은 처음부터 그 자리에
       }
-      if (pos) { p.tx = pos[0]; p.tz = pos[1]; p.face = face; }   // 이 화면에 없는 책이면 그 자리에 머문다
+      if (p.courierBot) { courierRoute(p, s); pos = [p.goal[0], p.goal[1]]; face = p.goal[2]; }
+      if (pos && !(p.route && p.route.length)) { p.tx = pos[0]; p.tz = pos[1]; p.face = face; }   // 이 화면에 없는 책이면 그 자리에 머문다
       var say = s.say || '';
       var tagKey = say + '|' + (s.job || '');
       if (tagKey !== (p.lastSay || '|')) { p.lastSay = tagKey; setStaffTag(p, s, say); }   // 말이나 하는 일이 바뀌면 이름표를 다시
@@ -6041,8 +6062,22 @@
     drawBoard(d.board || {}, d.log || []);
   }
   function updateStaff(p, dt, now) {
+    if (p.route && p.route.length) {   // 거쳐 갈 곳 (배달 로봇: 사무실 문 → 서재 입구 → …): 가까워지면 다음 곳으로
+      var wp = p.route[0];
+      p.tx = wp[0]; p.tz = wp[1]; p.face = null;
+      if (Math.hypot(wp[0] - p.g.position.x, wp[1] - p.g.position.z) < 0.45) {
+        p.route.shift();
+        if (!p.route.length && p.goal) { p.tx = p.goal[0]; p.tz = p.goal[1]; p.face = p.goal[2]; }
+      }
+    }
+    if (p.courierBot) {   // 데스크에 닿으면 손 흔들며 상자를 내려놓고, 돌아갈 때는 빈손
+      var atDesk = p.leg === 'desk' && !(p.route && p.route.length) && Math.hypot(p.tx - p.g.position.x, p.tz - p.g.position.z) < 0.3;
+      if (atDesk && !p.waved) { p.waved = true; robotEmote(p, 'Wave'); robotMood(p, 'Surprised', 1); }
+      if (p.box) p.box.visible = p.leg !== 'out';
+      if (p.emote) { p.emote.left -= dt; if (p.emote.left <= 0) { p.emote.act.fadeOut(0.3); p.emote = null; } }
+    }
     var dx = p.tx - p.g.position.x, dz = p.tz - p.g.position.z, d = Math.hypot(dx, dz), moving = d > 0.15;
-    if (d > 40) { p.g.position.x = p.tx; p.g.position.z = p.tz; moving = false; }
+    if (d > 40 && !p.courierBot) { p.g.position.x = p.tx; p.g.position.z = p.tz; moving = false; }   // (배달 로봇은 길 건너에서 걸어온다)
     if (moving) {
       var step = Math.min(d, (d > 8 ? 2.4 : 1.35) * dt * Math.max(0.2, p.walkW));   // 멀면 바삐 걷는다
       p.g.position.x += dx / d * step; p.g.position.z += dz / d * step;
