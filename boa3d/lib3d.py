@@ -99,7 +99,7 @@ def save_settings(libraries):
     return data_
 
 
-PEOPLE_KINDS = ("walk", "browse", "read", "sit", "chat", "staff", "trooper", "elf", "robot", "beach")
+PEOPLE_KINDS = ("walk", "browse", "read", "sit", "chat", "staff", "trooper", "elf", "beach")   # (로봇은 배달 로봇으로만 - 인물 수에서 뺌)
 PEOPLE_MAX = 20
 
 
