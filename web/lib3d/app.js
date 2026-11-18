@@ -253,10 +253,10 @@
     });
   }
 
-  // ── 미로 서가: 입구 로비 뒤를 책장 벽으로 막고 가운데 한 곳만 열어 미로 입구로. 서가 구역 사이 통로(세로 통로·가로 통로·뒤 통로)를
-  // 격자 점으로 보고, 층마다 정해진 무작위로 길을 하나씩 뚫어(가지 뻗기) 나머지 통로는 양면 책장 벽으로 막는다.
-  // 모든 구역은 반드시 이어지고(돌아가는 길은 없다), 서가 구역의 책장(뒤·양옆)도 벽이 된다. 걷는 사람·직원도 뚫린 길로만 다닌다.
-  var MAZE_H = 2.45, MAZE_T = 0.45, mazeSpineBase = null;
+  // ── 미로 서가: 입구 로비 뒤부터 서가 층 전체가 좁은 길(칸 약 2.5m)의 책장 미로. 서가 구역은 문 하나 달린 방이 되고,
+  // 나머지 칸 사이는 층마다 정해진 무작위로 길을 뚫고(가지 뻗기 + 가끔 돌아가는 길) 막힌 칸 사이는 양면 책장 벽으로 막는다.
+  // 로비와 미로 사이 벽은 입구 한 칸만 열린다. 걷는 손님·AI 직원도 칸 그래프(L.mg)를 따라 뚫린 길로만 다닌다.
+  var MAZE_H = 2.45, MAZE_T = 0.3, mazeSpineBase = null;
   function mazeSpines() {   // 양면 책장 벽에 꽂힌 책등 (한 장 = 가로 2.4m)
     if (mazeSpineBase) return mazeSpineBase;
     var r = rnd(4242);
@@ -293,69 +293,7 @@
     var cap = new T.Mesh(new T.BoxGeometry(lx + 0.06, 0.05, lz + 0.06), M.oak); cap.position.set(m.position.x, MAZE_H + 0.025, m.position.z); cap.castShadow = true; parent.add(cap);
     layout.maze.rects.push([x0, x1, z0, z1]);
   }
-  function mazeOpen(L, l1, a1, l2, a2) {   // 격자 두 점 사이 통로가 열렸나 (미로가 없으면 다 열림)
-    var Z = L && L.maze; if (!Z) return true;
-    if (a1 === a2) return a1 === 0 || !!Z.open['h:' + Math.min(l1, l2) + ':' + a1];
-    var lo = Math.min(a1, a2);
-    if (lo === 0) return l1 === Z.mid;   // 로비 ↔ 첫 통로: 미로 입구 한 곳
-    return !!Z.open['v:' + l1 + ':' + lo];
-  }
-  function addMaze(seed) {
-    var L = layout; if (!L || !L.rows || !(L.sections || []).length) return;
-    var cols = L.cols, rows = L.rows, G = GAP, Dp = BOOTH_D + GAP, HT = MAZE_T / 2;
-    var lanes = [], aisle = [null];   // aisle[a]: a번째 가로 통로 가운데 z (1..rows: 서가 줄 앞, rows+1: 맨 뒤)
-    for (var c = 0; c <= cols; c++) lanes.push((c - cols / 2) * (BOOTH_W + G));
-    for (var a = 1; a <= rows; a++) aisle.push(-LOBBY + G / 2 - (a - 1) * Dp);
-    var lastBack = -LOBBY - (rows - 1) * Dp - BOOTH_D;
-    aisle.push((lastBack + L.back) / 2);
-    var mid = 0; lanes.forEach(function (x, k) { if (Math.abs(x) < Math.abs(lanes[mid])) mid = k; });
-    var sepZ = -LOBBY + G + HT;
-    var Z = L.maze = { open: {}, rects: [], mid: mid, sepZ: sepZ, backZ: aisle[rows + 1], lastBack: lastBack, backX: [], aisle: aisle, lanes: lanes };
-    // 가지 뻗기 (미로 입구에서 시작, 층마다 같은 미로)
-    var r = rnd(seed * 389 + 7), seen = {}, stack = [[mid, 1]];
-    seen[mid + ':1'] = true;
-    while (stack.length) {
-      var cur0 = stack[stack.length - 1], l = cur0[0], aa = cur0[1];
-      var nb = [[l - 1, aa], [l + 1, aa], [l, aa - 1], [l, aa + 1]].filter(function (q) { return q[0] >= 0 && q[0] <= cols && q[1] >= 1 && q[1] <= rows + 1 && !seen[q[0] + ':' + q[1]]; });
-      if (!nb.length) { stack.pop(); continue; }
-      var nx = nb[Math.floor(r() * nb.length)];
-      Z.open[nx[1] === aa ? 'h:' + Math.min(l, nx[0]) + ':' + aa : 'v:' + l + ':' + Math.min(aa, nx[1])] = true;
-      seen[nx[0] + ':' + nx[1]] = true; stack.push(nx);
-    }
-    var hw = L.w / 2, zr = function (a) { return a <= rows ? [aisle[a] - G / 2, aisle[a] + G / 2] : [L.back, lastBack]; };
-    // 막힌 가로 통로: 서가 구역 오른쪽 끝선에 세로로 (구역 앞은 왼쪽 통로 쪽에 붙는다)
-    for (a = 1; a <= rows + 1; a++) for (c = 0; c < cols; c++) if (!Z.open['h:' + c + ':' + a]) {
-      var bx = lanes[c + 1] - G / 2, zz = zr(a);
-      mazeWall(bx - HT, bx + HT, zz[0] - (a <= rows ? 1.1 : 0), zz[1]);   // 구역 오른쪽 책장 끝(입구 모서리 빈틈)까지 막는다
-      if (a === rows + 1) Z.backX.push(bx);
-    }
-    // 막힌 세로 통로: 서가 구역 옆 가운데를 가로질러 (바깥 통로는 벽까지)
-    for (a = 1; a <= rows; a++) for (c = 0; c <= cols; c++) if (!Z.open['v:' + c + ':' + a]) {
-      var cz = -LOBBY - BOOTH_D / 2 - (a - 1) * Dp;
-      mazeWall(c === 0 ? -hw : lanes[c] - G / 2, c === cols ? hw : lanes[c] + G / 2, cz - HT, cz + HT);
-    }
-    // 로비와 미로 사이 책장 벽 (미로 입구 한 곳만)
-    var ox = lanes[mid], ow = 1.5;
-    mazeWall(-hw, ox - ow, sepZ - HT, sepZ + HT);
-    mazeWall(ox + ow, hw, sepZ - HT, sepZ + HT);
-    var lintel = new T.Mesh(new T.BoxGeometry(ow * 2 + 0.3, 0.3, MAZE_T + 0.04), M.oak); lintel.position.set(ox, MAZE_H + 0.15, sepZ); lintel.castShadow = true; parent.add(lintel);
-    var gate = textTex(['미로 서가 · 입구', '책장 사이로 길을 찾아 보세요'], 1024, 220, '#1d1e20', '#f5f2ec', 70);
-    var gs = new T.Mesh(new T.BoxGeometry(3.2, 0.68, 0.05), [M.black, M.black, M.black, M.black, new T.MeshBasicMaterial({ map: gate }), M.black]);
-    gs.position.set(ox, MAZE_H + 0.68, sepZ + 0.05); parent.add(gs);
-    // 서가 구역 책장(뒤·양옆)도 벽으로
-    L.sections.forEach(function (sc) {
-      Z.rects.push([sc.x - BOOTH_W / 2, sc.x + BOOTH_W / 2, sc.z - BOOTH_D / 2, sc.z - BOOTH_D / 2 + 0.6]);
-      [-1, 1].forEach(function (sd) {
-        var ex = sc.x + sd * BOOTH_W / 2;
-        Z.rects.push([Math.min(ex, ex - sd * 0.6), Math.max(ex, ex - sd * 0.6), sc.z - BOOTH_D / 2, sc.z + 2.95]);
-      });
-    });
-  }
-  function mazeBlocked(x, z) {
-    var Z = layout && layout.maze; if (!Z) return false;
-    for (var k = 0; k < Z.rects.length; k++) { var q = Z.rects[k]; if (x > q[0] - 0.25 && x < q[1] + 0.25 && z > q[2] - 0.25 && z < q[3] + 0.25) return true; }
-    return false;
-  }
+  function mazeOpen(L, l1, a1, l2, a2) { return true; }   // (미로가 없는 층의 통로 격자는 다 열림)
   function mazePath(L, from, to, shuffle) {   // 격자 점 사이 가장 짧은 길 [[l, a], ...] (from 포함)
     var rowsN = L.rowsZ.length, lanesN = L.lanes.length, prev = {}, q = [from], key = function (n) { return n[0] + ':' + n[1]; };
     prev[key(from)] = null;
@@ -375,35 +313,115 @@
     while (c0) { out.unshift(c0); c0 = prev[key(c0)]; }
     return out;
   }
-  function mazeRegion(x, z) {   // 서재 안 한 점이 속한 격자 점 (+ 서가 구역 안이면 구역 앞으로 나오는 점)
-    var L = layout, Z = L.maze, lanes = L.lanes, A = L.rowsZ, rows = L.rows, G = GAP;
-    var near = function () { var b = 0; lanes.forEach(function (lx, k) { if (Math.abs(lx - x) < Math.abs(lanes[b] - x)) b = k; }); return b; };
-    var inAisle = function (a) {
-      var k = Math.max(0, Math.min(lanes.length - 2, Math.floor((x - lanes[0]) / (BOOTH_W + G))));
-      if (x <= lanes[0]) return [0, a]; if (x >= lanes[lanes.length - 1]) return [lanes.length - 1, a];
-      if (mazeOpen(L, k, a, k + 1, a)) return [Math.abs(x - lanes[k]) < Math.abs(x - lanes[k + 1]) ? k : k + 1, a];
-      return [x < lanes[k + 1] - G / 2 ? k : k + 1, a];
-    };
-    if (z > Z.sepZ) return { node: [near(), 0] };
-    for (var a = 1; a <= rows; a++) if (Math.abs(z - A[a]) <= G / 2) return { node: inAisle(a) };
-    if (z < Z.lastBack) return { node: inAisle(rows + 1) };
-    var rr = Math.max(0, Math.min(rows - 1, Math.round((-LOBBY - BOOTH_D / 2 - z) / (BOOTH_D + G)))), cz = -LOBBY - BOOTH_D / 2 - rr * (BOOTH_D + G);
-    var l = near();
-    if (Math.abs(x - lanes[l]) < G / 2 || l === 0 && x < lanes[0] || l === lanes.length - 1 && x > lanes[l]) return { node: [l, z > cz ? rr + 1 : rr + 2] };
-    var bc = Math.max(0, Math.min(lanes.length - 2, Math.floor((x - lanes[0]) / (BOOTH_W + G))));
-    return { node: [bc, rr + 1], via: [x, A[rr + 1]] };   // 서가 구역 안: 구역 앞 통로로 나와서
+  function addMaze(seed) {
+    var L = layout; if (!L || !L.rows || !(L.sections || []).length) return;
+    var cols = L.cols, rows = L.rows, G = GAP, Dp = BOOTH_D + GAP, hw = L.w / 2, HT = MAZE_T / 2, r = rnd(seed * 389 + 7);
+    var lanes = []; for (var c = 0; c <= cols; c++) lanes.push((c - cols / 2) * (BOOTH_W + G));
+    // 칸 나누기 (x: 왼쪽부터, z: 로비 쪽부터 뒤로) - 서가 구역 경계가 칸 경계에 오도록
+    var xs = [-hw], zs = [-LOBBY + G];
+    function seg(arr, to, n) { var from = arr[arr.length - 1]; for (var k = 1; k <= n; k++) arr.push(from + (to - from) * k / n); }
+    seg(xs, lanes[0] + G / 2, Math.max(1, Math.round((lanes[0] + G / 2 + hw) / 2.6)));
+    for (c = 0; c < cols; c++) { seg(xs, lanes[c + 1] - G / 2, 4); if (c < cols - 1) seg(xs, lanes[c + 1] + G / 2, 2); }
+    seg(xs, hw, Math.max(1, Math.round((hw - lanes[cols] + G / 2) / 2.6)));
+    seg(zs, -LOBBY, 2);
+    for (var rr = 0; rr < rows; rr++) { seg(zs, -LOBBY - BOOTH_D - rr * Dp, 3); if (rr < rows - 1) seg(zs, -LOBBY - (rr + 1) * Dp, 2); }
+    seg(zs, L.back, Math.max(1, Math.round((zs[zs.length - 1] - L.back) / 2.4)));
+    var nx = xs.length - 1, nz = zs.length - 1, N = nx * nz, id = function (i, k) { return k * nx + i; };
+    var cx = function (i) { return (xs[i] + xs[i + 1]) / 2; }, czc = function (k) { return (zs[k] + zs[k + 1]) / 2; };
+    // 서가 구역이 차지한 칸 → 방 번호
+    var room = new Int16Array(N).fill(-1), rooms = [];
+    L.sections.forEach(function (sc, j) {
+      var cells = [];
+      for (var k = 0; k < nz; k++) for (var i = 0; i < nx; i++) {
+        if (Math.abs(cx(i) - sc.x) < BOOTH_W / 2 && Math.abs(czc(k) - sc.z) < BOOTH_D / 2) { room[id(i, k)] = j; cells.push([i, k]); }
+      }
+      var top = Math.min.apply(null, cells.map(function (q) { return q[1]; }));
+      var front = cells.filter(function (q) { return q[1] === top; }).map(function (q) { return q[0]; });
+      var door = front[1 + Math.floor(r() * Math.max(1, front.length - 2))];   // 문: 앞쪽 칸 하나 (가장자리 칸은 피해서)
+      rooms.push({ sc: sc, top: top, door: door, i0: Math.min.apply(null, front), i1: Math.max.apply(null, front) });
+    });
+    // 가지 뻗기: 미로 입구 칸에서 시작
+    var open = {}, ek = function (a, b) { return a < b ? a + '-' + b : b + '-' + a; };
+    var ent = 0; for (var i0 = 0; i0 < nx; i0++) if (Math.abs(cx(i0)) < Math.abs(cx(ent))) ent = i0;
+    var seen = new Uint8Array(N), stack = [id(ent, 0)]; seen[stack[0]] = 1;
+    function nbrs(n) { var i = n % nx, k = (n - i) / nx, out = []; if (i > 0) out.push(n - 1); if (i < nx - 1) out.push(n + 1); if (k > 0) out.push(n - nx); if (k < nz - 1) out.push(n + nx); return out; }
+    while (stack.length) {
+      var cur0 = stack[stack.length - 1];
+      var nb = nbrs(cur0).filter(function (m) { return !seen[m] && room[m] < 0; });
+      if (!nb.length) { stack.pop(); continue; }
+      var nx0 = nb[Math.floor(r() * nb.length)]; open[ek(cur0, nx0)] = true; seen[nx0] = 1; stack.push(nx0);
+    }
+    for (var n = 0; n < N; n++) if (room[n] < 0) nbrs(n).forEach(function (m) { if (m > n && room[m] < 0 && !open[ek(n, m)] && r() < 0.03) open[ek(n, m)] = true; });   // 가끔 돌아가는 길
+    for (n = 0; n < N; n++) if (room[n] >= 0) nbrs(n).forEach(function (m) { if (room[m] === room[n]) open[ek(n, m)] = true; });   // 방 안은 트여 있다
+    rooms.forEach(function (rm) { open[ek(id(rm.door, rm.top), id(rm.door, rm.top - 1))] = true; });   // 방 문
+    var Z = L.maze = { rects: [], sepZ: zs[0], backX: [], xs: xs, zs: zs, nx: nx, nz: nz, room: room, rooms: rooms, ent: ent };
+    // 벽: 막힌 칸 경계마다 (같은 선 위에서 이어지는 것은 한 벽으로)
+    var runs = {};
+    function addRun(key, at, from, to) { (runs[key] = runs[key] || []).push([at, from, to]); }
+    for (var k = 0; k < nz; k++) for (var i = 0; i < nx; i++) {
+      var a0 = id(i, k);
+      if (i < nx - 1 && !open[ek(a0, a0 + 1)]) addRun('v' + (i + 1), k, zs[k + 1], zs[k]);
+      if (k < nz - 1 && !open[ek(a0, a0 + nx)]) addRun('h' + (k + 1), i, xs[i], xs[i + 1]);
+    }
+    for (i = 0; i < nx; i++) if (i !== ent) addRun('h0', i, xs[i], xs[i + 1]);   // 로비와 미로 사이 (입구 한 칸만)
+    Object.keys(runs).forEach(function (key) {
+      var list = runs[key].sort(function (p0, q0) { return p0[0] - q0[0]; }), vert = key[0] === 'v', line = vert ? xs[+key.slice(1)] : zs[+key.slice(1)];
+      var s0 = null;
+      list.forEach(function (q, j) {
+        if (!s0) s0 = [q[0], Math.min(q[1], q[2]), Math.max(q[1], q[2])];
+        else { s0[2] = Math.max(s0[2], Math.max(q[1], q[2])); s0[1] = Math.min(s0[1], Math.min(q[1], q[2])); }
+        var nxq = list[j + 1];
+        if (!nxq || nxq[0] !== q[0] + 1) {
+          if (vert) { mazeWall(line - HT, line + HT, s0[1] - HT, s0[2] + HT); if (s0[1] <= zs[nz] + 0.01) Z.backX.push(line); }
+          else mazeWall(s0[1] - HT, s0[2] + HT, line - HT, line + HT);
+          s0 = null;
+        }
+      });
+    });
+    // 미로 입구 상인방 + 간판 (로비 쪽)
+    var ox = cx(ent), ow = (xs[ent + 1] - xs[ent]) / 2;
+    var lintel = new T.Mesh(new T.BoxGeometry(ow * 2 + 0.3, 0.3, MAZE_T + 0.04), M.oak); lintel.position.set(ox, MAZE_H + 0.15, zs[0]); lintel.castShadow = true; parent.add(lintel);
+    var gate = textTex(['미로 서가 · 입구', '책장 사이로 길을 찾아 보세요'], 1024, 220, '#1d1e20', '#f5f2ec', 70);
+    var gs = new T.Mesh(new T.BoxGeometry(3.2, 0.68, 0.05), [M.black, M.black, M.black, M.black, new T.MeshBasicMaterial({ map: gate }), M.black]);
+    gs.position.set(ox, MAZE_H + 0.68, zs[0] + 0.05); parent.add(gs);
+    // 걷는 길 그래프 (칸 + 방 안 한 점 + 로비 점들)
+    var pts = [], adj = [];
+    for (n = 0; n < N; n++) { var ii = n % nx, kk = (n - ii) / nx; pts.push([cx(ii), czc(kk)]); adj.push([]); }
+    for (n = 0; n < N; n++) if (room[n] < 0) nbrs(n).forEach(function (m) { if (room[m] < 0 && open[ek(n, m)]) adj[n].push(m); });
+    var roomNode = rooms.map(function (rm) {
+      var v = pts.length; pts.push([cx(rm.door), rm.sc.z + BOOTH_D / 2 - 1.3]); adj.push([]);
+      var dc = id(rm.door, rm.top - 1); adj[v].push(dc); adj[dc].push(v); return v;
+    });
+    var lob = [], lz = L.front - 6.5;
+    lanes.concat([ox]).sort(function (p0, q0) { return p0 - q0; }).forEach(function (x0) { var v = pts.length; pts.push([x0, lz]); adj.push([]); lob.push(v); if (x0 === ox) { var e = id(ent, 0); adj[v].push(e); adj[e].push(v); } });
+    for (i = 1; i < lob.length; i++) { adj[lob[i]].push(lob[i - 1]); adj[lob[i - 1]].push(lob[i]); }
+    var walk = []; for (n = 0; n < pts.length; n++) if (n >= N || room[n] < 0) walk.push(n);
+    L.mg = { pts: pts, adj: adj, N: N, roomNode: roomNode, lobby: lob, walk: walk };
+  }
+  function mazeBlocked(x, z) {
+    var Z = layout && layout.maze; if (!Z) return false;
+    for (var k = 0; k < Z.rects.length; k++) { var q = Z.rects[k]; if (x > q[0] - 0.22 && x < q[1] + 0.22 && z > q[2] - 0.22 && z < q[3] + 0.22) return true; }
+    return false;
+  }
+  function mgPath(G0, a, b) {   // 칸 그래프에서 가장 짧은 길 (a 포함)
+    var prev = new Int32Array(G0.pts.length).fill(-2), q = [a], h = 0; prev[a] = -1;
+    while (h < q.length) { var n = q[h++]; if (n === b) break; G0.adj[n].forEach(function (m) { if (prev[m] === -2) { prev[m] = n; q.push(m); } }); }
+    if (prev[b] === -2) return [a];
+    var out = []; for (var c0 = b; c0 !== -1; c0 = prev[c0]) out.unshift(c0); return out;
+  }
+  function mgNode(x, z) {   // 서재 안 한 점이 속한 칸 그래프 점
+    var L = layout, Z = L.maze, G0 = L.mg;
+    if (z > Z.sepZ) { var b0 = G0.lobby[0]; G0.lobby.forEach(function (v) { if (Math.abs(G0.pts[v][0] - x) < Math.abs(G0.pts[b0][0] - x)) b0 = v; }); return b0; }
+    var i = 0, k = 0; while (i < Z.nx - 1 && x > Z.xs[i + 1]) i++; while (k < Z.nz - 1 && z < Z.zs[k + 1]) k++;
+    var n = k * Z.nx + i; return Z.room[n] >= 0 ? G0.roomNode[Z.room[n]] : n;
   }
   function mazeRoute(x0, z0, x1, z1) {   // 직원이 걷는 길: 거쳐 갈 점 [[x, z], ...] (미로가 없거나 서재 밖이면 null)
-    var L = layout; if (!L || !L.maze || !L.rowsZ) return null;
+    var L = layout; if (!L || !L.mg) return null;
     var inside = function (x, z) { return x > hall.x0 && x < hall.x1 && z > hall.z0 && z < hall.z1; };
     if (!inside(x0, z0) || !inside(x1, z1)) return null;
-    var s = mazeRegion(x0, z0), e = mazeRegion(x1, z1);
-    if (s.node[0] === e.node[0] && s.node[1] === e.node[1] && !s.via && !e.via) return [];
-    var out = [];
-    if (s.via) out.push(s.via);
-    mazePath(L, s.node, e.node).forEach(function (n) { out.push([L.lanes[n[0]], L.rowsZ[n[1]]]); });
-    if (e.via) out.push(e.via);
-    return out;
+    var a = mgNode(x0, z0), b = mgNode(x1, z1);
+    if (a === b) return [];
+    return mgPath(L.mg, a, b).map(function (n) { return L.mg.pts[n].slice(); });
   }
 
   function addSection(lib, index) {
@@ -3603,11 +3621,11 @@
     var lanes = [], rowsZ = [L.front - 6.5];
     for (var c = 0; c <= L.cols; c++) lanes.push((c - L.cols / 2) * (BOOTH_W + GAP));
     for (var rr = 0; rr < L.rows; rr++) rowsZ.push(-LOBBY + GAP / 2 - rr * (BOOTH_D + GAP));
-    if (L.maze) rowsZ.push(L.maze.backZ);   // 미로: 맨 뒤 통로도 길
     L.lanes = lanes; L.rowsZ = rowsZ;
     function walker(p, speed, row) {   // 통로를 걷는 사람으로 세운다
       var li = Math.floor(r() * lanes.length), zi = row === undefined ? Math.floor(r() * rowsZ.length) : Math.min(row, rowsZ.length - 1);
       p.kind = 'walk'; p.node = [li, zi]; p.speed = speed;
+      if (L.mg) { var wn = L.mg.walk[Math.floor(r() * L.mg.walk.length)]; p.node = wn; place(p, L.mg.pts[wn][0], L.mg.pts[wn][1], 0); nextNode(p); return p; }   // 미로: 칸 그래프 위에서
       place(p, lanes[li], rowsZ[zi], 0);
       nextNode(p);
       return p;
@@ -3688,7 +3706,26 @@
   // 걷는 손님: 서점 안 아무 곳(통로 격자의 한 점)을 목적지로 골라 통로를 따라 꺾어 가며 간다.
   // 가로 먼저/세로 먼저를 그때그때 고르고, 통로 폭 안에서 좌우로 흩어져 걷는다. 서가 줄에 닿으면 가끔 서가 앞에 서서 둘러본다.
   // (통로로만 다니므로 서가·벽을 뚫지 않는다)
+  function planMazeRoute(p) {   // 미로 서가: 칸 그래프에서 아무 곳(가끔 서가 구역 방)을 골라 뚫린 길로
+    var L = layout, G0 = L.mg, from = typeof p.node === 'number' ? p.node : mgNode(p.g.position.x, p.g.position.z), route = [];
+    var goRoom = !p.alwaysWalk && G0.roomNode.length && p.r() < (p.robot ? 0.2 : 0.35);
+    var goal = goRoom ? G0.roomNode[Math.floor(p.r() * G0.roomNode.length)] : G0.walk[Math.floor(p.r() * G0.walk.length)];
+    if (!goRoom && p.r() < 0.3 && G0.adj[from].length) goal = G0.adj[from][Math.floor(p.r() * G0.adj[from].length)];   // 가끔은 옆 칸만
+    if (goal === from) goal = G0.adj[from][0] !== undefined ? G0.adj[from][0] : from;
+    mgPath(G0, from, goal).slice(1).forEach(function (n) {
+      var lob = n >= G0.N && G0.roomNode.indexOf(n) < 0, j = lob ? 2.4 : 0.7;
+      route.push({ node: n, x: G0.pts[n][0] + (p.r() - 0.5) * (lob && G0.adj[n].some(function (m) { return m < G0.N; }) ? 0.8 : j), z: G0.pts[n][1] + (p.r() - 0.5) * j });
+    });
+    var ri = G0.roomNode.indexOf(goal);
+    if (ri >= 0 && route.length) {   // 서가 구역 방에 들어가 평대·책장 앞에 서서 둘러본다
+      var last = route[route.length - 1];
+      last.x = G0.pts[goal][0] + (p.r() - 0.5) * 1.0; last.z = G0.pts[goal][1] - 0.2; last.lookYaw = Math.PI; last.stop = 3 + p.r() * 6;
+    }
+    if (!route.length) route.push({ node: from, x: G0.pts[from][0], z: G0.pts[from][1] });
+    p.route = route;
+  }
   function planRoute(p) {
+    if (layout.mg) return planMazeRoute(p);
     var L = layout, li = p.node[0], zi = p.node[1], lanes = L.lanes, rows = L.rowsZ, route = [];
     var gl = Math.floor(p.r() * lanes.length), gz = Math.floor(p.r() * rows.length);
     if (p.r() < 0.35) {   // 가끔은 가까운 곳만 (열린 이웃)
@@ -3697,8 +3734,7 @@
     }
     if (gl === li && gz === zi) gl = li > 0 ? li - 1 : Math.min(lanes.length - 1, li + 1);
     function pt(l, z) {
-      var gate = L.maze && l === L.maze.mid && z <= 1;   // 미로 입구를 지나는 점은 가운데로
-      return { node: [l, z], x: lanes[l] + (p.r() - 0.5) * (gate ? 1.0 : 3.0), z: rows[z] + (p.r() - 0.5) * (z === 0 ? 3.2 : 2.6) };
+      return { node: [l, z], x: lanes[l] + (p.r() - 0.5) * 3.0, z: rows[z] + (p.r() - 0.5) * (z === 0 ? 3.2 : 2.6) };
     }
     // 통로를 따라 꺾어 가는 가장 짧은 길 (미로면 뚫린 길로만)
     var path = mazePath(L, [li, zi], [gl, gz], p.r);
@@ -3835,7 +3871,7 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') savePos(); });
   function teleport(b) {
     if (b.floor !== cur) buildFloor(b.floor);
-    camera.position.set(b.x, EYE, b.z + BOOTH_D / 2 + 3.8); yaw = 0; pitch = -0.05; closeMap();
+    camera.position.set(b.x, EYE, b.z + BOOTH_D / 2 + (layout && layout.maze ? -0.9 : 3.8)); yaw = 0; pitch = -0.05; closeMap();   // 미로면 구역 방 안으로
   }
   var reading = false;
   window.addEventListener('keydown', function (e) {
@@ -4998,7 +5034,7 @@
     addBuilding(fl, COLS, fl.cinema ? 1 : Math.ceil(fl.libs.length / COLS));
     applyOutside.force = true; applyOutside();
     fl.libs.forEach(function (lib, j) { addSection(lib, j); });
-    if (!fl.cinema) addMaze(i + 1);   // 미로 서가 (입구 로비 뒤부터)
+    if (!fl.cinema) addMaze(i + 1);   // 미로 서가 (입구 로비 뒤부터 서가 층 전체)
     if (i === 0 && ARCADE.length && layout) { var sp0 = arcadeSpan(layout); if (sp0.x1 >= -layout.w / 2 + 6) ARC_X = [sp0.x1 - 0.8, sp0.x0 + 0.8]; }   // 포스터보다 먼저 자리를 잡는다
     addPosters(fl, i + 1);
     addBrunchCorner(i);
@@ -6157,7 +6193,7 @@
       return R0 ? [R0.fx + R0.s * (name === 'jazz' ? R0.bd - 2.2 : 2.2), R0.z + (name === 'jazz' ? 0.9 : -1.4), name === 'jazz' ? -R0.s * Math.PI / 2 : R0.s * Math.PI / 2 + 0.6] : null;
     }
     var b = (floors[cur] && floors[cur].booths || []).filter(function (x) { return x.name === name; })[0];
-    if (b) return [b.x + 2.6, b.z + BOOTH_D / 2 + 1.6, Math.PI];
+    if (b) return layout && layout.maze ? [b.x + 2.6, b.z + BOOTH_D / 2 - 1.0, Math.PI] : [b.x + 2.6, b.z + BOOTH_D / 2 + 1.6, Math.PI];   // 미로면 구역 방 안 (문 밖은 벽일 수 있다)
     return null;
   }
   function bookByKey(key) { return books.filter(function (b) { return b.key === key && b.mesh && b.kind !== 'banner'; })[0]; }
