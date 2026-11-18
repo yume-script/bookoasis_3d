@@ -44,7 +44,7 @@ BookOasis 세션(일반·성인·오디오북·비디오)마다 한 층, 보관�
 | 강과 다리 | 서재 앞 큰 강, 가운데 나무다리와 양옆 길 다리 |
 | 강 건너 캠핑장 | 텐트 다섯 가지, 화롯대, 해먹, 주차장, 말 방목장, 캠핑하는 사람들, 하늘의 새, 뒤로 침엽수 숲과 큰 산 |
 
-어느 층이든: 손님들(사람·스톰트루퍼·엘프·**로봇 손님**), 함께 보는 사람·채팅, AI 직원(사서·도슨트)과 AI 손님(AI 설정 시), 창밖 풍경(시간·계절·날씨), 표지 포스터, 의자에 앉기.
+어느 층이든: 손님들(사람·스톰트루퍼·엘프), 함께 보는 사람·채팅, AI 직원(사서·도슨트)과 AI 손님(AI 설정 시), 창밖 풍경(시간·계절·날씨), 표지 포스터, 의자에 앉기.
 
 ---
 
@@ -348,12 +348,13 @@ LIB3D_YMPLAYER_VIEWERS=true                        # 관람자 계정도 영화�
 - [오락실로] 또는 **Esc**(게임 중에도)로 닫으면 게임이 끝납니다. 창이 열린 동안 방향키는 게임에만 갑니다.
 - 건물 폭이 좁으면(보관함이 적을 때) 오락실을 만들지 않습니다.
 
-### 6-5. 로봇 손님
+### 6-5. 배달 로봇
 
-three.js 예제(webgl_animation_skinning_morph)의 노란 로봇이 층마다 한 대(기본, [인물 수]에서 0~20) 통로를 걸어 다닙니다.
-- 걷다가 자주 멈춰 **손 흔들기·고개 끄덕·엄지척·춤·점프·고개 젓기** 중 하나를 합니다.
-- 가까이(약 3m) 가면 이쪽을 돌아보며 손을 흔들거나 엄지를 들고, 잠깐 **놀란 표정**(얼굴 모핑)을 짓습니다(같은 로봇은 25초에 한 번).
-- 모형은 jsdelivr에서 처음 한 번 받습니다(받기 전에는 나오지 않음).
+three.js 예제(webgl_animation_skinning_morph)의 노란 로봇은 **배달 때만** 나옵니다(손님으로 걸어 다니지 않음).
+- 책·영상·웹툰이 들어오면 택배 상자를 들고 길 건너 **애순이 사무실**에서 나와 서재 입구 → 1층 안내 데스크로 걸어옵니다.
+- 데스크에서 손을 흔들며(놀란 표정) 상자를 내려놓고, 빈손으로 사무실로 돌아갑니다.
+- 사무실([창밖 풍경 > 거리])이 없거나 모형을 아직 못 받았으면 사람 배달원이 입구에서 들어옵니다.
+- 모형은 jsdelivr에서 처음 한 번 받습니다.
 
 ### 6-7. 재즈 청음실
 
@@ -510,7 +511,7 @@ POST /api/lib3d/events   (Authorization: Bearer LIB3D_EVENT_TOKEN)
 |---|---|---|---|
 | **보여 줄 보관함** | - | 세션별 묶음, [전부 보기] | `lib3d.json` `libraries` |
 | **AI 설정** | 연결 · 기능 · 도구 | 연결: 방식·주소·키·모델 / 기능: 손님 대화·간격·AI 직원 대화·하루 한도 / 도구: BookOasis MCP·[MCP 연결 시험]·기본 도구·추가 MCP | `.env` `LIB3D_AI_*` |
-| **층별 인물 수** | - | 층 × 인물 종류마다 0~20명(비우면 자동): 걷는·책 고르는·서서 읽는·벤치·대화 손님, 안내 직원, 스톰트루퍼, 엘프, 로봇 손님, 숨은 인물 | `people` |
+| **층별 인물 수** | - | 층 × 인물 종류마다 0~20명(비우면 자동): 걷는·책 고르는·서서 읽는·벤치·대화 손님, 안내 직원, 스톰트루퍼, 엘프, 숨은 인물 | `people` |
 | **창밖 풍경** | 풍경 | 시간(자동·낮·노을·밤) · 계절(자동·봄·여름·가을·겨울) · 날씨(맑음·흐림·비·눈·자동) | `outside` |
 | | 거리 | 길 건너 간판 이름(한 줄에 하나), 갤러리·재즈 청음실·사무실·현수막 건물 이름 (비우면 그 공간 없음) | `street` |
 | | 현수막 | 없음 / 그림 주소(서버가 받아 둠, 6시간마다 갱신, 15MB까지) / 보관함 표지(정한 간격마다 무작위, 누르면 작품 카드) | `banner`, `banner_lib`, `banner_sec` |
@@ -694,4 +695,4 @@ location / {
 
 ---
 
-**출처** - 바깥 풍경: 말·새(Horse·Stork·Flamingo·Parrot, mirada / ro.me - three.js 예제), 하늘 반사 그림 royal_esplanade_1k.hdr(Poly Haven, CC0 - three.js 예제), 날씨 Open-Meteo. 3D 모형 파일: GlamVelvetSofa·ChairDamaskPurplegold (© Wayfair, Eric Chadwick, CC BY 4.0), DiffuseTransmissionPlant (© Darmstadt Graphics Group, CC BY 4.0) - Khronos glTF Sample Assets / Ferrari 458 Italia (vicent091036, three.js 예제). 사람 모형: three.js 예제의 Xbot·Michelle·readyplayer.me·스톰트루퍼·엘프. 로봇 손님: RobotExpressive (Tomás Laulhé / Quaternius, CC0, 표정·동작 Don McCurdy) - three.js 예제.
+**출처** - 바깥 풍경: 말·새(Horse·Stork·Flamingo·Parrot, mirada / ro.me - three.js 예제), 하늘 반사 그림 royal_esplanade_1k.hdr(Poly Haven, CC0 - three.js 예제), 날씨 Open-Meteo. 3D 모형 파일: GlamVelvetSofa·ChairDamaskPurplegold (© Wayfair, Eric Chadwick, CC BY 4.0), DiffuseTransmissionPlant (© Darmstadt Graphics Group, CC BY 4.0) - Khronos glTF Sample Assets / Ferrari 458 Italia (vicent091036, three.js 예제). 사람 모형: three.js 예제의 Xbot·Michelle·readyplayer.me·스톰트루퍼·엘프. 배달 로봇: RobotExpressive (Tomás Laulhé / Quaternius, CC0, 표정·동작 Don McCurdy) - three.js 예제.

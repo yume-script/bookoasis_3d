@@ -2866,14 +2866,14 @@
     loadCollada();
     if (!T.GLTFLoader || !T.SkeletonUtils) return;
     var loader = new T.GLTFLoader();
-    // 로봇 손님: three.js 예제 webgl_animation_skinning_morph의 RobotExpressive (Tomás Laulhé/Quaternius, CC0)
+    // 배달 로봇: three.js 예제 webgl_animation_skinning_morph의 RobotExpressive (Tomás Laulhé/Quaternius, CC0)
     loader.load(MODEL_BASE + 'RobotExpressive/RobotExpressive.glb', function (rg) {
       rg.scene.traverse(function (o) { if (o.geometry) o.geometry.userData.shared = true; (Array.isArray(o.material) ? o.material : o.material ? [o.material] : []).forEach(function (m) { m.userData.keep = true; }); });
       var box = new T.Box3().setFromObject(rg.scene);
       HUMAN.robot = rg; HUMAN.robotScale = 1.3 / Math.max(0.1, box.max.y - box.min.y);   // 키 1.3m쯤 (사람보다 조금 작게)
       HUMAN.robotClips = {}; rg.animations.forEach(function (c) { HUMAN.robotClips[c.name] = c; });
       respawn();
-    }, undefined, function (e) { console.warn('3D 서재 로봇 손님 모형:', e && e.message); });
+    }, undefined, function (e) { console.warn('3D 서재 배달 로봇 모형:', e && e.message); });
     loader.load(MODEL_BASE + 'Xbot.glb', function (gltf) {
       gltf.scene.traverse(function (o) { if (o.geometry) o.geometry.userData.shared = true; });
       var raw = {};
@@ -3401,7 +3401,7 @@
   var PEOPLE_KINDS = [
     { k: 'walk', label: '걷는 손님' }, { k: 'browse', label: '책 고르는 손님' }, { k: 'read', label: '서서 읽는 손님' },
     { k: 'sit', label: '벤치 손님' }, { k: 'chat', label: '대화하는 손님(쌍)' }, { k: 'staff', label: '안내 직원' },
-    { k: 'trooper', label: '스톰트루퍼' }, { k: 'elf', label: '엘프' }, { k: 'robot', label: '로봇 손님' }, { k: 'beach', label: '숨은 인물(산타 토끼)' },
+    { k: 'trooper', label: '스톰트루퍼' }, { k: 'elf', label: '엘프' }, { k: 'beach', label: '숨은 인물(산타 토끼)' },
   ];
   var PEOPLE_MAX = 20;
   function spawnPeople(fl, seed) {
@@ -3484,11 +3484,7 @@
       for (i = 0; i < troops; i++) walker(trooperHuman(rnd(seed * 131 + 9 + i * 19)), 0.85, i === 0 ? 1 : undefined);
     }
     // 엘프: 로비에서 시작해 통로를 걷는다 (뼈대를 못 심었으면 로비에 피규어로)
-    // 로봇 손님: 통로를 걷다 멈추면 이런저런 동작, 가까이 가면 인사 (모형을 받은 뒤)
-    if (HUMAN.robot) {
-      var robots = cnt('robot', 1);
-      for (i = 0; i < robots; i++) walker(robotHuman(rnd(seed * 173 + 29 + i * 31)), 1.05, i === 0 ? 0 : undefined);
-    }
+    // (로봇은 손님으로 걷지 않는다 - 책·영상이 들어올 때 배달 로봇으로만: makeStaff/courierRobot)
     var elves = cnt('elf', 1);
     for (i = 0; i < elves; i++) {
       if (HUMAN.elfRig && HUMAN.gltf) walker(elfWalker(rnd(seed * 163 + 17 + i * 23)), 1.0, i === 0 ? 0 : undefined);
