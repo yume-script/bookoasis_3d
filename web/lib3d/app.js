@@ -92,6 +92,7 @@
       g.fillStyle = 'rgba(70,45,25,0.35)'; g.fillRect(col * pw + pw - 2, 0, 2, h);
     }
   }, [6, 6]);
+  var FLOOR_TILE = 7, FLOOR_SIZE = [1, 1];   // 바닥 무늬 한 장이 덮는 길이(m) - 사진 마루로 바뀌면 더 촘촘히
   var skyTex = canvasTex(64, 256, function (g, w, h) {   // 창밖 (밝은 하늘)
     var grd = g.createLinearGradient(0, 0, 0, h);
     grd.addColorStop(0, '#dff0ff'); grd.addColorStop(0.7, '#f7fbff'); grd.addColorStop(1, '#e8efe2');
@@ -1249,7 +1250,7 @@
     g.fillStyle = 'rgba(0,0,0,0.1)'; for (var sx = 0; sx < w; sx += w / 4) g.fillRect(sx, 0, 1.5, h);   // 이음 솔기
   }, [4, 1]);
   var CAMP = {
-    water: new T.MeshStandardMaterial({ map: waterTex, color: 0x4f86a8, roughness: 0.12, metalness: 0.55 }),
+    water: new T.MeshStandardMaterial({ map: waterTex, color: 0x4f86a8, roughness: 0.12, metalness: 0.55 }),   // 물결 사진(법선)은 photoTextures()
     bank: new T.MeshStandardMaterial({ color: 0x8e8a80, roughness: 0.95 }),
     wood: new T.MeshStandardMaterial({ color: 0x8a6645, roughness: 0.85 }),
     dirt: new T.MeshStandardMaterial({ color: 0xb09a78, roughness: 1 }),
@@ -2372,7 +2373,7 @@
     var d = front - back, cz = (front + back) / 2;
     hall = { x0: -w / 2 + 0.6, x1: w / 2 - 0.6, z0: back + 0.6, z1: front - 0.6 };
     layout = { w: w, front: front, back: back, cols: cols, rows: rows, sections: [] };
-    floorTex.repeat.set(w / 7, d / 7);
+    FLOOR_SIZE = [w, d]; floorTex.repeat.set(w / FLOOR_TILE, d / FLOOR_TILE);
     var fl0 = new T.Mesh(new T.PlaneGeometry(w, d), M.floor);
     fl0.rotation.x = -Math.PI / 2; fl0.receiveShadow = true; add(fl0, 0, 0, cz);
     var ceil = new T.Mesh(new T.PlaneGeometry(w, d), M.ceil);
@@ -2526,6 +2527,33 @@
   // ── 사람 모형: 옷 입은 사람(three.js 예제의 Michelle)에 Xbot의 걷기·서 있기 동작을 옮겨 입힌다 ──
   // Michelle을 못 받으면 Xbot 마네킹으로, 둘 다 못 받으면 위의 단순한 사람으로 그대로 둔다.
   var MODEL_BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r175/examples/models/gltf/';
+  // ── 실사 질감: three.js 공개 예제의 사진 텍스처로 바닥 마루·잔디·강물을 바꾼다 (사진 색 + 요철·거칠기·물결 법선).
+  // 받는 동안과 못 받으면 그린 질감(canvasTex) 그대로. 그린 질감의 반복·이동(물 흐름)을 사진에도 그대로 쓴다.
+  var TEX_BASE = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r175/examples/textures/';
+  function photo(path, color, cb) {
+    new T.TextureLoader().load(TEX_BASE + path, function (t) {
+      if (color) t.encoding = T.sRGBEncoding;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 8;
+      cb(t);
+    }, undefined, function () { console.warn('3D 서재 사진 질감을 받지 못해 그린 질감을 씁니다:', path); });
+  }
+  function follow(base, t) {   // 그린 질감과 같은 반복·이동 (같은 Vector2를 같이 써서 나중에 바뀌어도 따라간다)
+    t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat = base.repeat; t.offset = base.offset; return t;
+  }
+  function photoTextures() {
+    photo('hardwood2_diffuse.jpg', true, function (t) {   // 원목 마루 사진 (판자 2.4m 정도)
+      floorTex.image = t.image; floorTex.needsUpdate = true;
+      FLOOR_TILE = 2.4; floorTex.repeat.set(FLOOR_SIZE[0] / FLOOR_TILE, FLOOR_SIZE[1] / FLOOR_TILE);
+      M.floor.color.set(0xf2e2cc);   // 밝은 서재 마루 느낌은 남기게 살짝만 밝게
+      M.floor.needsUpdate = true;
+    });
+    photo('hardwood2_bump.jpg', false, function (t) { M.floor.bumpMap = follow(floorTex, t); M.floor.bumpScale = 0.015; M.floor.needsUpdate = true; });
+    photo('hardwood2_roughness.jpg', false, function (t) { M.floor.roughnessMap = follow(floorTex, t); M.floor.roughness = 0.9; M.floor.needsUpdate = true; });
+    photo('terrain/grasslight-big.jpg', true, function (t) { grassTex.image = t.image; grassTex.needsUpdate = true; });
+    photo('waternormals.jpg', false, function (t) {   // 잔물결 (흐르는 그린 물무늬와 같이 움직인다)
+      CAMP.water.normalMap = follow(waterTex, t); CAMP.water.normalScale = new T.Vector2(0.45, 0.45); CAMP.water.needsUpdate = true;
+    });
+  }
   var HUMAN = { gltf: null, dressed: null, clips: {}, dclips: {}, looks: [], beachMat: null, man: null };
   // 남자 손님(readyplayer.me 예제 모형): 윗옷·바지 색과 수염
   var MAN_LOOKS = [
@@ -6215,6 +6243,7 @@
   resize();
   home();
   loadHumans();
+  photoTextures();
   loadOutEnv();
   loadHorse();
   loadBirds();
