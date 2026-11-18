@@ -79,7 +79,8 @@ class ActivityTest(unittest.TestCase):
         from boa3d import lib3d_discord as dc, lib3d_where as wh
         cases = {"ZEEPS 편집국": "book", "편집국 자리에서 원고 교정": "book", "영상팀 편집실": "video", "스튜디오": "video", "카페 오후세시": "cafe",
                  "솥뚜껑 주점": "eat", "회의실": "meeting", "영상팀 회의실": "meeting", "BookOasis 3D 서재": "library", "공원 산책": "street",
-                 "집": "home", "집에서 쉬는 중": "home", "우리 집 거실": "home", "강가 캠핑장": "camp", "어딘가": "street"}
+                 "집": "home", "집에서 쉬는 중": "home", "우리 집 거실": "home", "강가 캠핑장": "camp", "어딘가": "street",
+                 "갤러리": "gallery", "재즈 청음실": "jazz", "서재 앞마당": "street"}
         for loc, want in cases.items():
             self.assertEqual(wh.place_of(loc), want, loc)
         self.assertEqual(wh.place_of("자리", company="ZEEPS 영상콘텐츠팀"), "video")      # 모르는 곳이면 소속으로

@@ -1970,6 +1970,9 @@
     var L = layout, seat = null, list;
     if ((place === 'book' || place === 'video') && OFFICE && (list = OFFICE[place]) && idx < list.length) seat = list[idx];
     else if ((place === 'cafe' || place === 'eat') && CAFE && CAFE.seats.length) seat = CAFE.seats[idx % CAFE.seats.length];
+    else if ((place === 'gallery' || place === 'jazz') && placePos(place)) {   // 길 건너 갤러리·재즈 청음실 (디스코드 봇 거리 배치와 같은 건물)
+      var gq = placePos(place); return { pos: [gq[0] + ((idx % 3) - 1) * 0.9, gq[1] + Math.floor(idx / 3) * 0.9], face: gq[2] };
+    }
     else if (place === 'library') { var lq = placePos('lounge'); return { pos: [lq[0] + ((idx % 4) - 1.5) * 1.1, lq[1] + Math.floor(idx / 4) * 1.2 - 0.6], face: lq[2] }; }
     else if (place === 'camp' && RV && RV.fire) { var ca = 0.9 + idx * 0.75; return { pos: [RV.fire.x + Math.sin(ca) * 3.3, RV.fire.z + Math.cos(ca) * 3.3], face: ca + Math.PI }; }
     else if (place === 'street' || (place === 'camp') || ((place === 'cafe' || place === 'eat') && !CAFE)) {
