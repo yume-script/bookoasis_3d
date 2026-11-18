@@ -2529,7 +2529,7 @@
   }
   function isOutside(x, z) { return cur === 0 && layout && (z > layout.front + 0.2 || Math.abs(x) > layout.w / 2 + 0.2); }
   function walkable(x, z) {   // 걸어 다닐 수 있는 곳: 서재 안 + (1층이면) 문 + 앞마당 + 양옆 보도
-    if (x >= hall.x0 && x <= hall.x1 && z >= hall.z0 && z <= hall.z1) return !mazeBlocked(x, z) && !(CINE_WALL != null && Math.abs(z - CINE_WALL) < 0.4 && Math.abs(x) > 2.6);   // 영화관 칸막이
+    if (x >= hall.x0 && x <= hall.x1 && z >= hall.z0 && z <= hall.z1) return !mazeBlocked(x, z) && !stairBlocked(x, z) && !(CINE_WALL != null && Math.abs(z - CINE_WALL) < 0.4 && Math.abs(x) > 2.6);   // 영화관 칸막이
     if (cur !== 0 || !layout) return false;
     var L = layout, ax = Math.abs(x), outer = L.w / 2 + 4.6;
     if (ax < DOOR_W / 2 - 0.35 && z > hall.z1 - 0.1 && z < L.front + 1.0) return autoDoor ? autoDoor.open > 0.55 : true;   // 문이 열려야 지나간다
@@ -2539,15 +2539,111 @@
     if (roomWalk(x, z)) return true;   // 횡단보도 건너 방들 (갤러리·재즈 청음실·사무실)
     return false;
   }
+  // ── 걸어서 오르내리는 계단: 로비 옆벽을 따라 넓은 원목 계단(한 층 30단, 9m). 짝수 층은 오른쪽, 홀수 층은 왼쪽 벽에서 위층으로 오르고
+  // (위층에서는 같은 자리가 아래로 내려가는 계단 구멍), 계단을 거의 다 오르면 위층 계단 중간으로, 거의 다 내려가면 아래층 계단으로 이어진다.
+  // 영화관 층은 계단이 없다 (엘리베이터로).
+  var STAIR = { up: null, down: null, rects: [] }, ST_RUN = 0.3, ST_N = 30, ST_RISE = CEIL / 30, ST_W = 3.0, ST_Z1 = 1.6, ST_Z0 = ST_Z1 - 30 * 0.3, stairY = 0;
+  function stairOK(i) { return !!(floors[i] && floors[i + 1] && !floors[i].cinema && !floors[i + 1].cinema); }   // i층 ↔ i+1층 계단이 있나
+  function stairSide(i) { return i % 2 === 0 ? 1 : -1; }   // i층에서 오르는 계단이 붙는 벽 (1: 오른쪽)
+  function stairRect(w, side) {
+    var x0 = side > 0 ? w / 2 - 0.8 - ST_W : -w / 2 + 0.8, x1 = x0 + ST_W;
+    return { x0: x0, x1: x1, xi: side > 0 ? x0 : x1, side: side, z0: ST_Z0, z1: ST_Z1 };
+  }
+  function stairPlan(w) {
+    return { up: stairOK(cur) ? stairRect(w, stairSide(cur)) : null, down: cur > 0 && stairOK(cur - 1) ? stairRect(w, stairSide(cur - 1)) : null, rects: [] };
+  }
+  function holePlane(w, d, cz, hole, dir) {   // 바닥(dir -1)·천장(dir 1) 판, 계단 자리에 구멍 (무늬는 판 전체에 한 장)
+    if (!hole) return new T.PlaneGeometry(w, d);
+    var sh = new T.Shape(); sh.moveTo(-w / 2, -d / 2); sh.lineTo(w / 2, -d / 2); sh.lineTo(w / 2, d / 2); sh.lineTo(-w / 2, d / 2); sh.lineTo(-w / 2, -d / 2);
+    var ly = function (z) { return dir < 0 ? cz - z : z - cz; }, ya = ly(hole.z0), yb = ly(hole.z1), m = dir > 0 ? 0.15 : 0;
+    var h = new T.Path(), y0 = Math.min(ya, yb) - m, y1 = Math.max(ya, yb) + m, x0 = hole.x0 - m, x1 = hole.x1 + m;
+    h.moveTo(x0, y0); h.lineTo(x0, y1); h.lineTo(x1, y1); h.lineTo(x1, y0); h.lineTo(x0, y0);
+    sh.holes.push(h);
+    var g = new T.ShapeGeometry(sh), pa = g.attributes.position, uv = g.attributes.uv;
+    for (var k = 0; k < pa.count; k++) uv.setXY(k, (pa.getX(k) + w / 2) / w, (pa.getY(k) + d / 2) / d);
+    return g;
+  }
+  function stairH(x, z) {   // 계단 위 발 높이 (바닥 0, 오르는 계단 +, 내려가는 계단 -)
+    var t = function (r) { return r && x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1 ? Math.max(0, Math.min(ST_N, (r.z1 - z) / ST_RUN)) * ST_RISE : null; };
+    var u = t(STAIR.up); if (u != null) return u;
+    var dn = t(STAIR.down); if (dn != null) return dn - CEIL;
+    return 0;
+  }
+  function stairBlocked(x, z) {
+    for (var k = 0; k < STAIR.rects.length; k++) { var q = STAIR.rects[k]; if (x > q[0] - 0.2 && x < q[1] + 0.2 && z > q[2] - 0.2 && z < q[3] + 0.2) return true; }
+    return false;
+  }
+  function addStairs(fl) {
+    var r0 = STAIR.up, r1 = STAIR.down, glassM = M.glassPane;
+    var riser = new T.MeshStandardMaterial({ color: 0xf3efe8, roughness: 0.7 });
+    function steps(r, base) {   // 계단 단 (base: 맨 아래 높이)
+      for (var k = 0; k < ST_N; k++) {
+        var hgt = (k + 1) * ST_RISE, st = new T.Mesh(unitBox, [riser, riser, M.oak, M.oak, riser, riser]);
+        st.scale.set(r.x1 - r.x0, hgt, ST_RUN + 0.002); st.position.set((r.x0 + r.x1) / 2, base + hgt / 2, r.z1 - (k + 0.5) * ST_RUN);
+        st.castShadow = st.receiveShadow = true; parent.add(st);
+      }
+    }
+    function glass(x0, x1, z0, z1, y, len) {   // 유리 난간 + 원목 손잡이 (수평)
+      var alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0), L = alongX ? Math.abs(x1 - x0) : Math.abs(z1 - z0);
+      var gp = new T.Mesh(new T.PlaneGeometry(L, 1.0), glassM); gp.position.set((x0 + x1) / 2, y + 0.5, (z0 + z1) / 2); if (!alongX) gp.rotation.y = Math.PI / 2; parent.add(gp);
+      var hr = new T.Mesh(unitBox, M.oak); hr.scale.set(alongX ? L : 0.07, 0.06, alongX ? 0.07 : L); hr.position.set(gp.position.x, y + 1.03, gp.position.z); hr.castShadow = true; parent.add(hr);
+    }
+    function shaft(r, y0, y1, lamp) {   // 계단 구멍 둘레 벽 (위층으로 뚫린 곳·아래층으로 꺼진 곳이 비어 보이지 않게)
+      var cx = (r.x0 + r.x1) / 2, czm = (r.z0 + r.z1) / 2, H = y1 - y0, m = lamp ? 0.15 : 0.02;
+      [[cx, r.z0 - m, r.x1 - r.x0 + 2 * m, 0.1], [cx, r.z1 + m, r.x1 - r.x0 + 2 * m, 0.1], [r.xi - r.side * m, czm, 0.1, r.z1 - r.z0 + 2 * m], [r.side > 0 ? r.x1 + 0.7 : r.x0 - 0.7, czm, 0.1, r.z1 - r.z0 + 2 * m]].forEach(function (q) {
+        var wl = new T.Mesh(unitBox, M.wall); wl.scale.set(q[2], H, q[3]); wl.position.set(q[0], y0 + H / 2, q[1]); parent.add(wl);
+      });
+      if (lamp) { var cap = new T.Mesh(new T.PlaneGeometry(r.x1 - r.x0, r.z1 - r.z0), M.lamp); cap.rotation.x = Math.PI / 2; cap.position.set(cx, y1 - 0.01, czm); parent.add(cap); }
+    }
+    function sign(text, x, y, z, rotY) {
+      var tx = textTex([text], 640, 120, '#1d1e20', '#f5f2ec', 60);
+      var sg = new T.Mesh(new T.BoxGeometry(2.2, 0.42, 0.04), [M.black, M.black, M.black, M.black, new T.MeshBasicMaterial({ map: tx }), M.black]);
+      sg.position.set(x, y, z); sg.rotation.y = rotY || 0; parent.add(sg);
+    }
+    var lab = function (i) { return floors[i] ? floors[i].label.replace(/\s.*$/, '') : ''; };
+    if (r0) {   // 위층으로 오르는 계단 + 기운 유리 난간 + 천장 위 계단실
+      steps(r0, 0);
+      var slope = Math.atan2(CEIL, ST_N * ST_RUN), len = Math.hypot(CEIL, ST_N * ST_RUN);
+      var g = new T.Group(); g.position.set(r0.xi, 0, r0.z1); g.rotation.x = slope; parent.add(g);
+      var gp = new T.Mesh(new T.PlaneGeometry(len, 1.0), glassM); gp.rotation.y = Math.PI / 2; gp.position.set(0, ST_RISE + 0.5, -len / 2); g.add(gp);
+      var hr = new T.Mesh(unitBox, M.oak); hr.scale.set(0.07, 0.06, len); hr.position.set(0, ST_RISE + 1.03, -len / 2); hr.castShadow = true; g.add(hr);
+      shaft(r0, CEIL, CEIL + 3.2, true);
+      sign('계단 ↑ ' + lab(cur + 1), (r0.x0 + r0.x1) / 2, 2.6, r0.z1 + 0.6, 0);
+      STAIR.rects.push([r0.xi - 0.06, r0.xi + 0.06, r0.z0 - 0.1, r0.z1 - 0.9]);   // 옆 난간 (앞 세 단은 옆에서도 오를 수 있게)
+      STAIR.rects.push([r0.x0, r0.x1, r0.z0 - 0.3, r0.z0 - 0.05]);              // 계단 뒤 끝
+      STAIR.rects.push(r0.side > 0 ? [r0.x1 + 0.05, r0.x1 + 0.9, r0.z0, r0.z1 - 0.9] : [r0.x0 - 0.9, r0.x0 - 0.05, r0.z0, r0.z1 - 0.9]);   // 벽 쪽 틈
+    }
+    if (r1) {   // 아래층으로 내려가는 계단 구멍 + 둘레 유리 난간 (안쪽 끝에서 내려간다)
+      steps(r1, -CEIL);
+      shaft(r1, -CEIL - 0.2, 0, false);
+      var pit = new T.Mesh(new T.PlaneGeometry(r1.x1 - r1.x0 + 0.3, 1.2), M.floor); pit.rotation.x = -Math.PI / 2; pit.position.set((r1.x0 + r1.x1) / 2, -CEIL + 0.01, r1.z1 + 0.6); parent.add(pit);
+      glass(r1.xi, r1.xi, r1.z0 + 0.6, r1.z1, 0, 0);
+      glass(r1.x0, r1.x1, r1.z1, r1.z1, 0, 0);
+      sign('계단 ↓ ' + lab(cur - 1), (r1.x0 + r1.x1) / 2, 2.6, r1.z0 - 0.4, 0);
+      STAIR.rects.push([r1.xi - 0.06, r1.xi + 0.06, r1.z0 + 0.6, r1.z1 + 0.06]);   // 옆 난간 (안쪽 끝 0.6m는 옆에서도 들어간다)
+      STAIR.rects.push([r1.x0, r1.x1, r1.z1 - 0.06, r1.z1 + 0.06]);              // 앞 끝 난간
+      STAIR.rects.push(r1.side > 0 ? [r1.x1 + 0.05, r1.x1 + 0.9, r1.z0 + 0.6, r1.z1] : [r1.x0 - 0.9, r1.x0 - 0.05, r1.z0 + 0.6, r1.z1]);   // 벽 쪽 틈
+    }
+  }
+  function stairHop(dir) {   // 계단으로 위·아래층에 닿았다: 그 층을 짓고 같은 계단의 이어지는 자리로
+    var to = cur + dir, side = stairSide(dir > 0 ? cur : to), w0 = layout.w;
+    var x = camera.position.x, z = camera.position.z, off = side > 0 ? w0 / 2 - x : x + w0 / 2;
+    buildFloor(to);
+    var nx = side > 0 ? layout.w / 2 - off : -layout.w / 2 + off;
+    camera.position.x = nx; camera.position.z = z;
+    stairY = stairH(nx, z); camera.position.y = EYE + stairY;
+  }
+
   function addBuilding(fl, cols, rows) {
     var w = cols * BOOTH_W + (cols - 1) * GAP + 12, back = -LOBBY - rows * (BOOTH_D + GAP) - 2, front = 10;
     var d = front - back, cz = (front + back) / 2;
     hall = { x0: -w / 2 + 0.6, x1: w / 2 - 0.6, z0: back + 0.6, z1: front - 0.6 };
     layout = { w: w, front: front, back: back, cols: cols, rows: rows, sections: [] };
     FLOOR_SIZE = [w, d]; floorTex.repeat.set(w / FLOOR_TILE, d / FLOOR_TILE);
-    var fl0 = new T.Mesh(new T.PlaneGeometry(w, d), M.floor);
+    STAIR = stairPlan(w);   // 위·아래층 계단 자리 (바닥·천장에 계단 구멍)
+    var fl0 = new T.Mesh(holePlane(w, d, cz, STAIR.down, -1), M.floor);
     fl0.rotation.x = -Math.PI / 2; fl0.receiveShadow = true; add(fl0, 0, 0, cz);
-    var ceil = new T.Mesh(new T.PlaneGeometry(w, d), M.ceil);
+    var ceil = new T.Mesh(holePlane(w, d, cz, STAIR.up, 1), M.ceil);
     ceil.rotation.x = Math.PI / 2; add(ceil, 0, CEIL, cz);
     // 매입 조명 (천장의 밝은 사각)
     for (var lz = front - 3; lz > back + 2; lz -= 4.5) {
@@ -4049,7 +4145,11 @@
     } else vel.set(0, 0);
     updateDoor(dt);
     var moving = Math.hypot(vel.x, vel.y);
-    camera.position.y = EYE + Math.sin(performance.now() / 160) * 0.012 * Math.min(1, moving / 3);   // 걸음 흔들림
+    var sh = stairH(camera.position.x, camera.position.z);
+    stairY += (sh - stairY) * Math.min(1, dt * 12);
+    if (STAIR.up && sh >= CEIL * 0.78) { stairHop(1); return; }       // 거의 다 올랐다 → 위층 계단으로
+    if (STAIR.down && sh <= -CEIL * 0.85) { stairHop(-1); return; }   // 거의 다 내려갔다 → 아래층 계단으로
+    camera.position.y = EYE + stairY + Math.sin(performance.now() / 160) * 0.012 * Math.min(1, moving / 3);   // 걸음 흔들림 (계단 높이)
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
   }
 
@@ -5034,7 +5134,8 @@
     addBuilding(fl, COLS, fl.cinema ? 1 : Math.ceil(fl.libs.length / COLS));
     applyOutside.force = true; applyOutside();
     fl.libs.forEach(function (lib, j) { addSection(lib, j); });
-    if (!fl.cinema) addMaze(i + 1);   // 미로 서가 (입구 로비 뒤부터 서가 층 전체)
+    if (!fl.cinema) addMaze(i + 1);
+    addStairs(fl);   // 걸어서 오르내리는 계단   // 미로 서가 (입구 로비 뒤부터 서가 층 전체)
     if (i === 0 && ARCADE.length && layout) { var sp0 = arcadeSpan(layout); if (sp0.x1 >= -layout.w / 2 + 6) ARC_X = [sp0.x1 - 0.8, sp0.x0 + 0.8]; }   // 포스터보다 먼저 자리를 잡는다
     addPosters(fl, i + 1);
     addBrunchCorner(i);
@@ -5131,6 +5232,7 @@
     if (d > 6) { p.g.position.x = p.tx; p.g.position.z = p.tz; d = 0; }   // 엘리베이터·지도 이동은 바로
     var k = Math.min(1, dt * 6);
     p.g.position.x += dx * k; p.g.position.z += dz * k;
+    if (!p.sit) p.g.position.y = stairH(p.g.position.x, p.g.position.z);   // 계단 위
     var cy = p.g.rotation.y, diff = Math.atan2(Math.sin(p.tyaw - cy), Math.cos(p.tyaw - cy));
     p.g.rotation.y = cy + diff * Math.min(1, dt * 8);
     var moving = p.moving || d > 0.08;
